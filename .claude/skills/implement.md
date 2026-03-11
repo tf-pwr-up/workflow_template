@@ -1,0 +1,125 @@
+# /implement — Parallel Code + Test Implementation
+
+Trigger: User approves a plan and wants implementation to begin.
+
+## Prerequisites (BLOCKING — do not skip)
+
+All three must be satisfied before implementation begins:
+
+1. **Phase 0 gap list must exist**: Check `ls docs/gaps/*.md`. If missing, STOP and run `/phase-0`.
+2. **A plan must have been approved**: From `/plan` or explicit user instruction. The plan must reference gap list items.
+3. **The plan should include a test strategy**: Every production file needs a corresponding test plan.
+
+## Instructions
+
+### Step 1: Prepare Implementation Units
+Break the approved plan into implementation units (typically one per file or tightly-coupled module). For each unit, identify:
+- Production file(s) to create/modify
+- Corresponding test file(s)
+- **Context files to read** (from the plan's "Read for context" list — see `/plan` Step 1)
+- Dependencies on other units (determines ordering)
+
+### Step 2: Implement Independent Units in Parallel
+For units with no dependencies on each other, spawn parallel agent pairs:
+
+**Code Agent** (per unit):
+- **Before writing any code, read the unit's context files** (listed in the plan). This is mandatory — never guess at contracts, response shapes, or route patterns.
+  - For page components: read the router file to register the route and construct correct links
+  - For API calls: read the backend route handler to verify response shape and any auto-unwrap/transform behaviour
+  - For forms: read the validation schema to ensure all required fields (including system fields not in dynamic definitions) have UI inputs
+- Implement the production code as specified in the plan
+- Follow project conventions from CLAUDE.md
+- If a reference implementation is defined in CLAUDE.md, read it (READ-ONLY) when needed for implementation details
+- Ensure language/framework strict mode compliance
+- Do NOT write tests
+
+**Test Agent** (per unit):
+- Write tests based on the PLAN and SPEC (not from the code agent's output — tests come from the specification)
+- Use the project's test framework (see CLAUDE.md)
+- Cover: happy path, edge cases, error conditions, boundary values
+- For API endpoints: test request validation, auth checks, response shapes
+- For services: test business logic, state transitions, error handling
+- Follow the project's test file naming convention (see CLAUDE.md)
+
+**E2E Test Agent** (runs once, after all units):
+- Review what features changed and determine which E2E tests need updating
+- For new user-facing features: add E2E tests covering the happy path
+- For changed behaviour: update existing E2E test assertions to match
+- For changed UI: update test selectors (text content, element selectors)
+- For schema changes: update seed data if new entity types or fields are needed
+- Follow patterns in existing E2E test files (see `/e2e` skill for conventions)
+- If no user-facing changes were made, skip this step
+
+### Step 3: Dependent Units
+After independent units complete, implement dependent units in dependency order, again with parallel code+test agents.
+
+### Step 3a: UI Review (when implementation includes UI components)
+
+If any implementation unit includes frontend page or component files, run the UI Review Agent on the new/changed UI code:
+
+- Checks design system compliance, visual states, responsive behaviour, dark mode, consistency, reference comparison, accessibility
+- See `.claude/skills/ui-review.md` for the complete checklist
+- Fix any BLOCKING issues immediately; SHOULD FIX issues before integration check
+
+### Step 3b: Smoke Wiring Check (MANDATORY — runs before full integration)
+
+After all code agents complete but before running the full test suite, perform a fast structural verification:
+
+1. **Route registration**: For every new/changed page component, verify it has an entry in the router. FAIL if missing.
+2. **Navigation reachability**: For every new route, grep the codebase for at least one link pointing to its pattern. FAIL if no inbound link exists.
+3. **API contract spot-check**: For every new/changed API call from the frontend, read the corresponding route handler and verify the frontend type annotation matches the actual response shape (accounting for any response transformation/unwrapping the API client performs). FAIL if mismatched.
+4. **Form completeness**: For every new/changed create/edit form, read the API's validation schema and verify every required field has a UI input — including system fields not in dynamic field definitions. FAIL if missing.
+
+If any FAIL: fix immediately before proceeding. This check is cheap (file reads only) and catches the most common class of wiring bugs before the expensive test suite runs.
+
+### Step 4: Integration Check
+After all units complete, run the Integration Agent:
+
+```
+1. Install dependencies (if new ones added)
+2. Type check the entire project (see CLAUDE.md for command)
+3. Lint check (see CLAUDE.md for command)
+4. Run all unit/integration tests (see CLAUDE.md for command)
+5. Run E2E tests if applicable (see /e2e skill; requires dev servers running)
+6. Check for cross-file issues:
+   - Missing imports
+   - Type mismatches at boundaries
+   - Unused exports
+7. Verify API contract alignment (MANDATORY — catches a known bug pattern):
+   - For every frontend API call, read the backend route handler
+   - Verify the expected response type matches what the API client returns after any transforms
+   - For create/edit forms, verify every required API field has a UI input (including system fields)
+   - For page components, verify each is registered in the router
+   - For every link in new/changed code, verify it matches a route pattern in the router
+```
+
+If E2E tests fail due to changed UI or behaviour, fix the E2E tests to match the new implementation. If E2E tests fail due to bugs in the implementation, fix the implementation.
+
+### Step 5: Fix Failures
+- If **tests fail**: fix the production code to match the test expectations (tests are the spec). Only fix the test if the test itself has a verifiable bug.
+- If **type errors**: fix type issues in the relevant files.
+- If **lint errors**: fix lint issues.
+- Re-run until all checks pass.
+
+### Step 6: Spec Compliance Check (MANDATORY — do not skip)
+
+After all checks pass, run a spec compliance verification:
+
+1. Read the gap list from `docs/gaps/`
+2. For each MISSING/PARTIAL item that was in scope for this implementation:
+   - Verify the code exists and matches the spec
+   - Verify it's reachable from the UI (if it's a route/page, there must be a link to it)
+   - Verify tests exist
+3. If any item is still MISSING or PARTIAL: flag it and list what remains
+
+This check catches the specific failure mode where routes exist but are unreachable (orphaned routes), or where code exists but doesn't match the expected behaviour.
+
+### Step 7: Present Results
+Show the user:
+1. Summary of what was implemented
+2. Test results (pass/fail counts)
+3. Spec compliance results (PASS/WARN/FAIL per gap list item)
+4. Any issues encountered and how they were resolved
+5. Any remaining gaps
+
+Wait for user approval before committing.
