@@ -71,6 +71,8 @@ claude
 
 Each phase gates the next. No planning without a gap list. No implementation without a plan. No deployment without passing all checks.
 
+For detailed Mermaid diagrams of the complete workflow, agent interactions, and data flows, see **[docs/workflow-diagram.md](docs/workflow-diagram.md)**.
+
 ## File Architecture
 
 ```
