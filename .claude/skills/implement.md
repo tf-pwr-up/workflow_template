@@ -114,12 +114,25 @@ After all checks pass, run a spec compliance verification:
 
 This check catches the specific failure mode where routes exist but are unreachable (orphaned routes), or where code exists but doesn't match the expected behaviour.
 
-### Step 7: Present Results
+### Step 7: Update CLAUDE.md (if new project knowledge was discovered)
+
+During implementation, new project-specific knowledge often emerges. After all checks pass, update CLAUDE.md's Project Configuration if any of the following were discovered:
+
+- **Commands** — if the integration check used commands not yet documented (dev server start, test runner, type checker, linter)
+- **Test File Conventions** — if test agents established naming patterns, environment directives, or test infrastructure helpers
+- **Established Patterns** — if code agents followed patterns that should be replicated (route factory signatures, service layer conventions, DI patterns, error handling approaches)
+- **Coding Conventions** — if implementation revealed conventions (import style, strict mode, file organization)
+- **Design System** — if UI components used shortcuts, tokens, or component patterns not yet documented
+
+Use the Edit tool to append to existing sections. Check what's already there to avoid duplicates. This step ensures the next implementation cycle has better context.
+
+### Step 8: Present Results
 Show the user:
 1. Summary of what was implemented
 2. Test results (pass/fail counts)
 3. Spec compliance results (PASS/WARN/FAIL per gap list item)
 4. Any issues encountered and how they were resolved
 5. Any remaining gaps
+6. Any updates made to CLAUDE.md Project Configuration
 
 Wait for user approval before committing.

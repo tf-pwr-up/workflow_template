@@ -79,6 +79,17 @@ Spawn review agents IN PARALLEL using the Agent tool (add UI Review Agent if UI 
 ### Step 3: Consolidate
 Merge all reviewer feedback. If any reviewer flags a BLOCKING issue (security vulnerability, architectural inconsistency, untestable pattern), revise the plan and note the revision.
 
+### Step 3b: Update CLAUDE.md (if new patterns or decisions emerged)
+
+If the review agents identified or confirmed architectural patterns, conventions, or decisions not yet in CLAUDE.md's Project Configuration section, update it:
+
+- **Architecture Agent** findings → update **Established Patterns** (e.g. "service layer uses pure functions with DI")
+- **Security Agent** findings → update **Established Patterns** (e.g. "auth middleware pattern", "input validation approach")
+- **Testability Agent** findings → update **Test File Conventions** (e.g. "unit tests adjacent to source", "E2E test naming")
+- **UI Review Agent** findings → update **Design System** (if design tokens or component patterns were confirmed)
+
+Use the Edit tool to append to existing sections. Do not overwrite — the Project Configuration is cumulative.
+
 ### Step 4: Present
 Show the user:
 1. The implementation plan (with any revisions noted)

@@ -60,6 +60,14 @@ Launch a Discovery Agent to produce a structural map of the source material.
 
 Output: Write `docs/analysis/00-structure.md` with the complete structural map.
 
+**Update CLAUDE.md**: After writing the structural map, update the Project Configuration section of `CLAUDE.md`:
+- **Stack** — runtime, frameworks, database, frontend, testing, build tools discovered
+- **Directory Structure** — key directories and their purposes
+- **Commands** — dev server, test, lint, type check commands found in package.json/Makefile/etc.
+- **Reference Implementation** — if analyzing a reference, record its path
+
+Use the Edit tool to replace the HTML comment placeholders with actual content. Preserve the section headers.
+
 ---
 
 ### Phase 2: Feature Decomposition
@@ -106,6 +114,14 @@ Launch agents for concerns that span feature areas:
    - If from specs: common workflows, shared UI patterns, cross-feature behaviours, standard response patterns, error handling requirements
 
 Output: Write `docs/analysis/90-design-system.md` and `docs/analysis/91-patterns.md`.
+
+**Update CLAUDE.md**: After writing cross-cutting docs, update the Project Configuration section:
+- **Design System** — CSS framework, config file, fonts, color tokens, shortcuts, icons, dark mode, responsive strategy
+- **Established Patterns** — recurring code patterns discovered (route factory, service layer, DI, auth, error handling, test infrastructure, etc.)
+- **Data Model Conventions** — data format, response conventions, state management approach
+- **Coding Conventions** — language mode, import style, file organization preferences
+
+Use the Edit tool to replace or append to existing content. Do not overwrite previously populated sections — merge new information.
 
 ---
 

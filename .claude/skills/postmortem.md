@@ -117,6 +117,8 @@ Format per entry:
 **Skill updated**: [which skill was modified]
 ```
 
+**Update CLAUDE.md**: Also update the **Bug Patterns** section in CLAUDE.md's Project Configuration with a one-line summary of the new pattern. This ensures review agents see it without needing to read the full registry. Use the Edit tool to append to the Bug Patterns section.
+
 ### Step 7: Verify the Fix
 
 After updating skills:

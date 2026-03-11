@@ -61,3 +61,12 @@ Present findings grouped by severity:
 - **CONSIDER** — suggestions for improvement (style, clarity, minor optimizations)
 
 Each finding must cite the specific file and line, and explain WHY it's an issue.
+
+### Step 4: Update CLAUDE.md (if review revealed undocumented conventions)
+
+If the review identified patterns or conventions being followed in the codebase that aren't yet documented in CLAUDE.md's Project Configuration, update the relevant sections:
+
+- **Coding Conventions** — coding style patterns the Architecture Agent observed (e.g. "all services use DI", "no default exports")
+- **Established Patterns** — recurring code patterns confirmed by the review (e.g. "error classes map to HTTP status codes")
+
+Only add conventions that are clearly established (seen in multiple files), not one-off patterns. Use the Edit tool to append.

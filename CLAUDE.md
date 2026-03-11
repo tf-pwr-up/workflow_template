@@ -2,7 +2,9 @@
 
 This file has two sections:
 1. **Workflow Rules** — generic, applies to any project using this skill set
-2. **Project Configuration** — project-specific settings that skills reference at runtime
+2. **Project Configuration** — populated automatically by skills as they discover project-specific details
+
+Skills update the Project Configuration section during workflow execution. Do not manually populate it — let the workflow fill it in.
 
 ---
 
@@ -149,101 +151,74 @@ Before any deployment or merge:
 
 ## Project Configuration
 
-> **This section is project-specific.** When using this workflow for a new project, replace the contents below with the project's actual settings. Skills read this section at runtime for project-specific details.
+> **This section is populated automatically by workflow skills.** It starts empty for new projects and accumulates project-specific knowledge as skills run. Skills that update this section:
+>
+> - `/analyze` → Stack, Directory Structure, Design System, Established Patterns (from Phase 1-3)
+> - `/plan` → Architecture Decisions, Established Patterns (from review agent feedback)
+> - `/implement` → Commands, Test File Conventions, Coding Conventions (discovered during integration checks)
+> - `/postmortem` → Bug Patterns (appended when bugs are found)
+>
+> **Do not delete existing entries** — only add or update. This section is cumulative project memory.
 
 ### Project Description
 
-This project replicates the functionality described in `docs/FUNCTIONAL-SPEC.md` as a standalone local-first application.
+<!-- Updated by: /analyze Phase 7, or manually by user -->
 
 ### Reference Implementation
 
-Path: `/Users/timfrench/labels/1c-portal-v2` (READ-ONLY — never modify files there)
-
-Use it to understand:
-- How specific features work
-- Data models and schemas
-- API contracts and response shapes
-- Edge cases and validation rules
-- UI components, layouts, styling, and user interactions
-- Design system tokens and visual patterns
-
-Always grep/read the actual code rather than relying on memory.
+<!-- Updated by: /analyze Step 0, or manually by user -->
+<!-- Format:
+Path: `/path/to/reference` (READ-ONLY — never modify)
+-->
 
 ### Stack
 
-- **Runtime**: Node.js with TypeScript (strict mode)
-- **API framework**: Hono (@hono/node-server)
-- **Database**: SQLite via better-sqlite3 (WAL mode, busy_timeout, synchronous=NORMAL)
-- **Frontend**: Preact + Signals, UnoCSS
-- **Testing**: Vitest (unit/integration), Playwright (E2E)
-- **Monorepo**: npm workspaces + Turbo (packages/shared, apps/api, apps/web)
+<!-- Updated by: /analyze Phase 1 (Discovery) -->
 
 ### Commands
 
-- **Dev servers**: `npm run dev` (API on :3000, Web on :5173)
-- **Type check**: `tsc --noEmit`
-- **Unit tests**: `npm test` (Vitest)
-- **E2E tests**: `npx playwright test --reporter=list`
-- **E2E install**: `npx playwright install --with-deps chromium`
-- **Lint**: `npm run lint`
-- **Health checks**: `curl -sf http://localhost:3000/health`, `curl -sf http://localhost:5173/`
+<!-- Updated by: /implement Step 4 (Integration Check), /e2e -->
+<!-- Format:
+- **Dev servers**: `command` (ports)
+- **Type check**: `command`
+- **Unit tests**: `command`
+- **E2E tests**: `command`
+- **Lint**: `command`
+- **Health checks**: URLs
+-->
 
 ### Directory Structure
 
-- `apps/api/` — backend API server
-- `apps/web/` — frontend SPA
-- `packages/shared/` — shared types and schemas
-- `apps/web/src/pages/` — page components
-- `apps/web/src/components/` — shared UI components
-- `apps/web/src/app.tsx` — router (route definitions)
-- `apps/api/src/routes/` — API route handlers
-- `packages/shared/src/schemas/` — Zod validation schemas
-- `e2e/` — Playwright E2E tests
-- `e2e/seed-data.json` — E2E seed data fixture
-- `docs/gaps/` — Phase 0 gap lists
-- `docs/analysis/` — Analysis corpus
-- `docs/bug-patterns.md` — Bug pattern registry
+<!-- Updated by: /analyze Phase 1 (Discovery) -->
 
 ### Test File Conventions
 
-- Unit/integration tests: `*.test.ts` adjacent to source file
-- E2E tests: `e2e/NN-feature.spec.ts` (numeric prefix for ordering)
-- Test files needing DOM: `// @vitest-environment jsdom` directive
+<!-- Updated by: /implement Step 2 (Test Agent), /plan (Testability Agent) -->
 
 ### Established Patterns
 
-- **Route factory**: `createXxxRoutes({ clock })` with default export for production
-- **Service layer**: pure functions taking `(db, ...args, clock)`, using `db.transaction()` for multi-step mutations
-- **DI for time**: all timestamps via injected `Clock.isoNow()`, never `new Date()` or SQL `datetime('now')`
-- **Org isolation**: `orgGuard` middleware checks membership, sets `orgRole` on context
-- **Auth**: JWT (jose, HS256 pinned), magic link login, session table
-- **Error classes**: domain errors (e.g. `EntityNotFoundError`) caught in routes → HTTP status codes
-- **Test infrastructure**: `createTestApp()` → in-memory DB + FakeClock + test doubles
-- **Zod schemas**: validated in route handlers, ZodError → 400
-- **API client auto-unwrap**: `handleResponse` in `api.ts` unwraps single-key JSON objects; multi-key objects are returned as-is
-- **Frontend imports**: relative imports (NOT @/ aliases — Vitest doesn't resolve them)
+<!-- Updated by: /analyze Phase 3 (Patterns), /plan (Architecture Agent), /implement (as patterns emerge) -->
+<!-- Format:
+- **Pattern name**: description with code signature
+-->
 
 ### Data Model Conventions
 
-- Flat entity format (no `data` wrapper) — system fields and custom fields at same level
-- Consistent error responses with appropriate HTTP status codes
-- No optimistic updates — server is authoritative
-- No data transformations — store and serve data as-is
+<!-- Updated by: /analyze Phase 2 (Feature Decomposition), /plan (Architecture Agent) -->
 
 ### Design System
 
-- **CSS framework**: UnoCSS with Tailwind presets
-- **Config file**: `apps/web/uno.config.ts`
-- **Global styles**: `apps/web/src/styles/global.css`
-- **Fonts**: Outfit (display), Inter (body), JetBrains Mono (mono)
-- **Color tokens**: `--color-primary-*` (cyan), `--color-accent-*` (amber), `--color-surface-*` (neutral)
-- **Shortcuts**: `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.input`, `.input-error`, `.card`, `.card-hover`, `.heading-1`–`.heading-4`, `.badge`, `.badge-draft`, `.badge-published`, `.container-narrow`, `.container-default`, `.container-wide`
-- **Icons**: Lucide via `i-lucide-*` class, standard size `w-4 h-4`
-- **Dark mode**: supported, all components need `dark:` variants
-- **Responsive**: mobile-first (`base` → `sm:` → `md:` → `lg:`)
+<!-- Updated by: /analyze Phase 3 (Design System Agent), /ui-review -->
 
 ### Coding Conventions
 
-- TypeScript strict mode
-- Keep file count small, each serving a distinct purpose
-- Avoid premature abstractions
+<!-- Updated by: /plan (Architecture Agent), /review (Architecture Agent) -->
+
+### Bug Patterns
+
+<!-- Updated by: /postmortem Step 6 — links to docs/bug-patterns.md for full details -->
+<!-- Format:
+See `docs/bug-patterns.md` for the full registry. Key patterns to watch for:
+- Pattern 1: brief description
+- Pattern 2: brief description
+-->
