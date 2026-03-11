@@ -26,25 +26,46 @@ Read CLAUDE.md for the project's E2E test framework and conventions. Common infr
 
 ## Instructions
 
-### Step 1: Run E2E Tests
+### Step 1: Run Contract Tests
 
-Execute the project's E2E test command (see CLAUDE.md). Typical:
+If the project has API contract tests (tests that hit the real API and verify response shapes match frontend expectations):
+
+- Run the contract test suite (see CLAUDE.md for command)
+- These verify response status codes, JSON shapes, required fields, and error formats
+- Capture: test names, pass/fail status, and duration per test
+
+If contract tests fail, record the failures but continue to Step 2 — collect all results before reporting.
+
+If no contract test suite exists, skip to Step 2.
+
+### Step 2: Run E2E Tests
+
+Execute the project's browser-based E2E tests (see CLAUDE.md for command). Typical:
 
 ```
 npx playwright test --reporter=list
 ```
 
-- Capture: test names, pass/fail status, duration, and screenshot/artifact paths for failures
-- If the E2E framework is not installed, install it first
+- These test critical user flows in a real browser
+- For failures, the framework may generate screenshots/artifacts
+- Capture: test names, pass/fail status, duration, and artifact paths for failures
 
-### Step 2: Report Results
+If the E2E framework is not installed, install it first.
+
+### Step 3: Report Results
 
 Present a structured summary:
 
 ```
 ## E2E Test Results
 
-### Tests: PASS/FAIL (X passed, Y failed)
+### Contract Tests: PASS/FAIL (X passed, Y failed)
+| Test Name            | Result | Duration |
+|----------------------|--------|----------|
+| GET /api/orgs        | PASS   | 45ms     |
+| POST /api/entities   | FAIL   | 120ms    |
+
+### Browser Tests: PASS/FAIL (X passed, Y failed)
 | Test Name              | Result | Duration |
 |------------------------|--------|----------|
 | Login flow             | PASS   | 2.1s     |
@@ -60,7 +81,7 @@ Present a structured summary:
 - **Suggested fix**: brief analysis of what likely caused the failure
 ```
 
-### Step 3: Cleanup
+### Step 4: Cleanup
 
 Remove test artifacts if all tests passed. If tests failed, keep artifacts for debugging.
 
@@ -88,7 +109,8 @@ Follow established patterns in the existing E2E test files:
 ## Output Format
 
 The final output must include:
-1. **Test results**: pass/fail count and table of results
-2. **Overall verdict**: PASS only if all tests pass with zero failures
-3. **Failure details**: error messages, screenshots, and suggested fixes
-4. **Cleanup status**: confirmation that test artifacts were removed (or kept for debugging)
+1. **Contract tests**: pass/fail count and table of results (if applicable)
+2. **Browser tests**: pass/fail count and table of results
+3. **Overall verdict**: PASS only if all suites pass with zero failures
+4. **Failure details**: error messages, screenshots, and suggested fixes
+5. **Cleanup status**: confirmation that test artifacts were removed (or kept for debugging)
