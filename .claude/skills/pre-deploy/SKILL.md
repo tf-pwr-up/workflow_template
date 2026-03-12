@@ -1,3 +1,8 @@
+---
+name: pre-deploy
+description: "Pre-Deployment Gate Check (tests, types, lint, security, spec compliance)."
+---
+
 # /pre-deploy — Pre-Deployment Gate Check
 
 Trigger: User wants to verify the project is ready for deployment or merge.
