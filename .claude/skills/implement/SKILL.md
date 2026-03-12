@@ -56,14 +56,26 @@ Every implementation unit MUST have BOTH a Code Agent AND a Test Agent launched 
 - Follow the project's test file naming convention (see CLAUDE.md)
 - **A unit with code but no tests is incomplete and MUST NOT be committed**
 
-**E2E Test Agent** (runs once, after all units):
+**E2E Test Agent** (runs once, after all units — MANDATORY for batches with user-facing changes):
+
+**CRITICAL — E2E means REAL servers, NO mocking:**
+E2E tests MUST hit real running frontend and API servers. They MUST NOT use `page.route()`, MSW, nock, or any other mechanism to mock API responses. If you mock the API, you are writing frontend integration tests, not E2E tests. The `/e2e` skill defines this requirement in detail — read it.
+
+**BLOCKING prerequisites — all must be satisfied:**
+1. **Playwright installed**: If not, install `@playwright/test`, browsers, create config and test directory.
+2. **Full-stack connectivity**: Frontend and API dev servers must BOTH be running, and the frontend must be able to reach the API (via proxy, CORS, or shared origin). If the project has separate frontend/API servers and no dev proxy is configured, **configure one** (e.g. Vite `server.proxy` in `vite.config.ts`) before writing any tests.
+3. **Seed data**: A mechanism to populate known test data via the real API must exist. If it doesn't, create a seed script or global setup that calls real API endpoints to create test fixtures.
+4. **Auth via real API**: Tests must authenticate by calling the real auth endpoint (not by injecting fake tokens). Create or use a test-only auth helper that obtains real session tokens from the API.
+
+**E2E test responsibilities:**
 - Review what features changed and determine which E2E tests need updating
-- For new user-facing features: add E2E tests covering the happy path
+- For new user-facing features: add E2E tests covering the happy path against real servers
 - For changed behaviour: update existing E2E test assertions to match
 - For changed UI: update test selectors (text content, element selectors)
-- For schema changes: update seed data if new entity types or fields are needed
-- Follow patterns in existing E2E test files (see `/e2e` skill for conventions)
-- If no user-facing changes were made, skip this step
+- For schema changes: update seed data script to include new types/fields
+- Follow the `/e2e` skill for conventions — especially the no-mocking rule
+
+**Skip conditions (narrow):** Only skip if the batch contains ZERO user-facing changes (e.g., purely backend refactoring with no API shape changes, or tooling-only changes). If in doubt, run E2E tests.
 
 ### Step 3: Dependent Units
 After independent units complete, implement dependent units in dependency order, again with parallel code+test agents.
@@ -95,7 +107,7 @@ After all units complete, run the Integration Agent:
 2. Type check the entire project (see CLAUDE.md for command)
 3. Lint check (see CLAUDE.md for command)
 4. Run all unit/integration tests (see CLAUDE.md for command)
-5. Run E2E tests if applicable (see /e2e skill; requires dev servers running)
+5. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
 6. **Test file count verification (BLOCKING)**:
    - Count the number of production files created/modified in this implementation
    - Count the number of test files created/modified

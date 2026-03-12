@@ -50,6 +50,30 @@ Before any work begins, verify the repo has the infrastructure needed for autono
 
 7. **Git repo** — If not initialized, run `git init` and create an initial commit.
 
+8. **E2E test infrastructure (MANDATORY — do not skip)**:
+   - Check if `@playwright/test` is installed: `npx playwright --version` or check `package.json`
+   - If NOT installed:
+     1. Install Playwright: `npm install -D @playwright/test` (in the root or the web app package, per project convention)
+     2. Install browsers: `npx playwright install --with-deps chromium`
+     3. Create `playwright.config.ts` at the project root (or web app root) with sensible defaults (baseURL from CLAUDE.md or `http://localhost:5173`, `testDir: './e2e'`, reporter: list, retries: 1)
+     4. Create the `e2e/` directory if it doesn't exist
+     5. Create a smoke test file `e2e/smoke.spec.ts` that verifies the app loads (navigate to `/`, assert page title or root element)
+     6. Run the smoke test to verify the infrastructure works: `npx playwright test`
+   - If already installed: verify `playwright.config.ts` exists and `e2e/` directory exists. Create them if missing.
+   - This step is BLOCKING — the pipeline MUST NOT proceed to Phase A until E2E infrastructure is verified working. "No E2E framework" is never an acceptable reason to skip E2E tests in Phase B.
+
+9. **Local dev connectivity (MANDATORY — do not skip)**:
+   E2E tests must hit REAL servers — not mocked APIs. This step ensures the full stack can run locally.
+   - **Identify architecture**: Read project config to determine if frontend and API are served from the same origin or separate servers.
+   - **If separate servers** (e.g. Vite frontend + Wrangler/Express API):
+     1. Verify a dev proxy is configured so the frontend can reach the API. Check `vite.config.ts` for `server.proxy`, or check for `VITE_API_URL` / equivalent env var.
+     2. If NO proxy exists: **configure one**. For Vite, add `server.proxy` entries in `vite.config.ts` that forward API paths (e.g. `/auth`, `/config`, `/entities`, `/health`) to the API server URL.
+     3. Verify both servers can start: run the frontend and API dev commands and confirm both respond.
+     4. Verify connectivity: from the frontend's base URL, hit an API endpoint (e.g. `/health`) and confirm JSON is returned, not HTML.
+   - **If same origin**: verify the single dev server starts and serves both API and assets.
+   - **Seed data**: Verify or create a mechanism to populate known test data via the real API. E2E tests need known state — not mocked fixtures.
+   - This step is BLOCKING — the pipeline MUST NOT proceed until the full stack runs locally and the frontend can reach the API. "API is hard to start" is not a reason to mock — it's a bug to fix.
+
 This step is idempotent — running it on an already-bootstrapped repo does nothing.
 
 ---
@@ -130,6 +154,11 @@ Add Batch N: <brief description of what was implemented>
 After committing:
 - Run `npx turbo test` to verify all unit tests still pass (regression check)
 - Run `npx turbo build` to verify types still clean
+- **Full-stack smoke test** (at least once per build, and after any batch that changes frontend-API connectivity):
+  1. Start both frontend and API dev servers
+  2. Verify the frontend can reach the API (curl the API health endpoint through the frontend's proxy)
+  3. Load the app in a headless browser and verify it renders (not a blank page, not an error)
+  4. If this fails, the proxy or dev setup is broken — fix before proceeding
 - If regression detected, fix immediately before proceeding to next batch
 
 #### Step B2: Pre-Deploy (after all batches complete)
