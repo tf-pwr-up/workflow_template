@@ -58,29 +58,24 @@ This step is idempotent — running it on an already-bootstrapped repo does noth
 
 #### Step A1: Comprehensive Gap Analysis
 
-Run a single `/phase-0` covering ALL remaining work (not per-batch). This produces the master gap list.
+**INVOKE `/phase-0` using the Skill tool.** Do NOT manually write a gap list — the `/phase-0` skill launches Inventory and Gap sub-agents that read actual code/specs. You MUST use the Skill tool to trigger it, not simulate its output.
 
 - If a recent gap list exists (`docs/gaps/`), read it and ask: "The gap list from [date] shows [X DONE, Y PARTIAL, Z MISSING]. Should I refresh it or use this?"
-- If no gap list exists, run `/phase-0` from scratch
+- If no gap list exists, invoke `/phase-0` from scratch via the Skill tool
 - Present the gap list to the user: counts, priorities, recommended batching
 
 **Gate: User confirms scope.** ("Approve this scope, or adjust?")
 
 #### Step A2: Master Plan with Batch Ordering
 
-Run `/plan` but with a broader scope — produce a **master plan** covering all approved work, organized into ordered batches:
+**INVOKE `/plan` using the Skill tool.** Do NOT manually write a plan — the `/plan` skill launches a Plan Agent and spawns parallel Review Agents (Architecture, Security, Performance, Testability, Spec Compliance, UI). You MUST use the Skill tool to trigger it, not produce the plan yourself.
 
-1. **Dependency analysis**: Identify which features depend on others (e.g., "entity CRUD pages need entity types to exist first")
-2. **Batch grouping**: Group features into batches where:
-   - Features within a batch are independent of each other (can be implemented in parallel)
-   - Batches are ordered by dependency (batch 2 may depend on batch 1's output)
-   - Each batch is a coherent, committable unit
-3. **Per-batch plan**: For each batch, specify:
-   - Implementation units with context files
-   - Test strategy (unit + E2E)
-   - Expected files created/modified
-   - Dependencies on prior batches (if any)
-4. **Run all review agents** (Architecture, Security, Performance, Testability, Spec Compliance, UI if applicable) against the FULL master plan — not per-batch
+Pass the scope context (batch ordering, dependency analysis) as arguments to the `/plan` invocation. The plan skill will:
+
+1. **Dependency analysis**: Identify which features depend on others
+2. **Batch grouping**: Group features into ordered batches
+3. **Per-batch plan**: Specify implementation units with context files, test strategy, expected files, dependencies
+4. **Run all review agents in parallel** against the FULL master plan — not per-batch
 
 Present the master plan with batch ordering to the user.
 
@@ -111,6 +106,8 @@ Before implementing, do a quick sanity check:
 - If something is fundamentally wrong (prior batch failed silently), stop the loop and report
 
 ##### B1.2: Implement (autonomous /implement with auto-commit)
+
+**INVOKE `/implement` using the Skill tool** for this batch. Do NOT write production code directly — the `/implement` skill launches parallel Code Agent + Test Agent pairs using the Agent tool. You MUST use the Skill tool to trigger `/implement`, not write code yourself.
 
 Run the `/implement` skill for this batch with these overrides:
 - **Skip prerequisite checks** — the master plan IS the approved plan; the gap list exists from Step A1
@@ -193,6 +190,39 @@ For large builds spanning many batches:
 - Each batch commit is atomic — if context resets, resume from the next uncommitted batch
 - The gap list tracks what's DONE — re-read it to determine where to resume
 - Prefer many small batches over few large ones (reduces context pressure per batch)
+
+## Checkpoint Enforcement (CRITICAL)
+
+At each phase boundary, the `/build` pipeline MUST verify that the required skill was actually invoked — not simulated. The checkpoints are:
+
+### Checkpoint 1: After Phase A1
+- **Verify**: The Skill tool was used to invoke `/phase-0`
+- **Verify**: A gap list file exists at `docs/gaps/*.md` that was produced by the Phase 0 agents (Inventory Agent + Gap Agent)
+- **If violated**: STOP. Do not proceed to A2. Invoke `/phase-0` properly.
+
+### Checkpoint 2: After Phase A2
+- **Verify**: The Skill tool was used to invoke `/plan`
+- **Verify**: Parallel review agents (Architecture, Security, Performance, Testability, Spec Compliance) were spawned and returned findings
+- **Verify**: A consolidated plan exists that incorporates review feedback
+- **If violated**: STOP. Do not proceed to Phase B. Invoke `/plan` properly.
+
+### Checkpoint 3: Before each batch in Phase B
+- **Verify**: The Skill tool will be used to invoke `/implement` for this batch
+- **Verify**: `/implement` will spawn parallel Code Agent + Test Agent pairs (not write code inline)
+- **If violated**: STOP the pipeline. The agent is bypassing the multi-agent workflow.
+
+### What counts as "invoked properly"
+- The Skill tool was called with the skill name (e.g., `skill: "phase-0"`)
+- The skill's internal agents (Inventory Agent, Gap Agent, Plan Agent, Review Agents, Code Agents, Test Agents) were launched via the Agent tool
+- The skill produced its expected artifacts (gap list, plan, code + tests)
+
+### What does NOT count
+- Manually writing the artifact file (e.g., writing `docs/gaps/*.md` by hand)
+- Summarising what the agents "would have found" without spawning them
+- Writing production code directly using Write/Edit tools instead of through Code Agents
+- Producing a plan without running Review Agents against it
+
+---
 
 ## Overrides
 

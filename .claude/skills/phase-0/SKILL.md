@@ -101,3 +101,11 @@ This skill is a hard prerequisite. The workflow rules require:
 - `/plan` checks for a gap list artifact before proceeding
 - `/implement` checks for both gap list and approved plan
 - If no gap list exists, these skills MUST invoke `/phase-0` first
+
+### Anti-Bypass
+
+This skill MUST be invoked via the Skill tool — not simulated by manually writing a gap list file. The value of Phase 0 comes from:
+1. The **Inventory Agent** reading actual reference code/specs (not the orchestrator summarising from memory)
+2. The **Gap Agent** reading actual current codebase files (not the orchestrator guessing what exists)
+
+If you find yourself writing `docs/gaps/*.md` directly without having launched these agents, you are bypassing Phase 0.
