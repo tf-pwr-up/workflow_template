@@ -1,3 +1,8 @@
+---
+name: sync-template
+description: "Sync Workflow Skills with Upstream Template (pull/push/status)."
+---
+
 # /sync-template — Sync Workflow Skills with Upstream Template
 
 Trigger: User wants to pull latest workflow improvements from the template, or push skill improvements back to the template.
@@ -12,17 +17,17 @@ These files are generic and should be identical across all projects using the te
 
 ```
 .claude/workflow-rules.md          # Workflow phases, gates, enforcement rules
-.claude/skills/analyze.md          # Deep analysis & documentation
-.claude/skills/e2e.md              # End-to-end integration tests
-.claude/skills/implement.md        # Parallel code + test implementation
-.claude/skills/phase-0.md          # Feature inventory & gap analysis
-.claude/skills/plan.md             # Multi-perspective planning
-.claude/skills/postmortem.md       # Bug postmortem & workflow improvement
-.claude/skills/pre-deploy.md       # Pre-deployment gate check
-.claude/skills/review.md           # Multi-perspective code review
-.claude/skills/spec-compliance.md  # Verify implementation matches spec
-.claude/skills/sync-template.md    # This file
-.claude/skills/ui-review.md        # UI quality review
+.claude/skills/analyze/SKILL.md
+.claude/skills/e2e/SKILL.md
+.claude/skills/implement/SKILL.md
+.claude/skills/phase-0/SKILL.md
+.claude/skills/plan/SKILL.md
+.claude/skills/postmortem/SKILL.md
+.claude/skills/pre-deploy/SKILL.md
+.claude/skills/review/SKILL.md
+.claude/skills/spec-compliance/SKILL.md
+.claude/skills/sync-template/SKILL.md
+.claude/skills/ui-review/SKILL.md
 ```
 
 ## Project-Specific Files (never pushed to template)
@@ -108,7 +113,7 @@ When the user runs `/sync-template push` or wants to share skill improvements wi
 
    # Copy shared files from the project
    cp <project>/.claude/workflow-rules.md .claude/workflow-rules.md
-   cp <project>/.claude/skills/*.md .claude/skills/
+   cp <project>/.claude/skills/*/SKILL.md .claude/skills/
 
    # Commit and push
    git add .claude/

@@ -1,3 +1,8 @@
+---
+name: ui-review
+description: "UI Quality Review (design system, states, responsive, dark mode, accessibility)."
+---
+
 # /ui-review — UI Quality Review
 
 Trigger: User invokes `/ui-review`, or automatically as part of `/review` and `/implement` for any user-facing changes.

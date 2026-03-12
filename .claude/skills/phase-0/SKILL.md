@@ -1,3 +1,8 @@
+---
+name: phase-0
+description: "Feature Inventory & Gap Analysis. MANDATORY before any planning or implementation."
+---
+
 # /phase-0 — Feature Inventory & Gap Analysis
 
 Trigger: MANDATORY before any planning or implementation. This skill MUST run before `/plan` or `/implement`.

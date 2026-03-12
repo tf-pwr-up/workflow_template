@@ -1,3 +1,8 @@
+---
+name: review
+description: "Multi-Perspective Code Review (architecture, security, performance, tests, UI)."
+---
+
 # /review — Multi-Perspective Code Review
 
 Trigger: User wants a review of existing or changed code.

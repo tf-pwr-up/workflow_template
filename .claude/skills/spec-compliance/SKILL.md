@@ -1,3 +1,8 @@
+---
+name: spec-compliance
+description: "Verify implementation matches spec (reachability, contracts, tests)."
+---
+
 # /spec-compliance — Verify Implementation Matches Spec
 
 Trigger: After implementation, before commit. Also invocable standalone to check current state.

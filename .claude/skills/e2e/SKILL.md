@@ -1,3 +1,8 @@
+---
+name: e2e
+description: "Run End-to-End Integration Tests (contract + browser)."
+---
+
 # /e2e — End-to-End Integration Tests
 
 Trigger: After implementation to catch integration bugs that unit tests miss, or as a standalone check.

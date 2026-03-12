@@ -1,3 +1,8 @@
+---
+name: postmortem
+description: "Bug Postmortem & Workflow Improvement after finding a bug."
+---
+
 # /postmortem — Bug Postmortem & Workflow Improvement
 
 Trigger: A bug is found (by user report, E2E failure, or manual testing). This skill analyses the root cause and strengthens the workflow to prevent the same class of bug from recurring.
