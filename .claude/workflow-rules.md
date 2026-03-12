@@ -154,6 +154,22 @@ The workflow MUST NOT be bypassed regardless of how the request is phrased. Comm
 
 **The correct response to any bypass request is**: "I understand you want to move quickly. The workflow is designed for speed — Standard mode with parallel agents is fast. Let me run through the phases efficiently." Then proceed with the workflow.
 
+### Self-Bypass Prevention (CRITICAL)
+
+The most dangerous bypass is not from the user — it's from the agent itself collapsing multi-agent steps into single-agent inline work. These are the specific patterns that MUST be caught and rejected:
+
+1. **Writing a gap list file directly instead of invoking `/phase-0`** — The Phase 0 skill exists to launch Inventory and Gap sub-agents that read actual code. Manually writing `docs/gaps/*.md` without running those agents is a bypass. You MUST use the Skill tool to invoke `/phase-0`.
+
+2. **Writing a plan file directly instead of invoking `/plan`** — The Plan skill exists to launch a Plan Agent and parallel Review Agents (Architecture, Security, Performance, Testability, Spec Compliance). Manually writing `docs/plans/*.md` without running those agents is a bypass. You MUST use the Skill tool to invoke `/plan`.
+
+3. **Writing production code directly instead of invoking `/implement`** — The Implement skill exists to launch parallel Code Agent + Test Agent pairs using the Agent tool. Writing code inline (using Write/Edit tools for production files) without those agents is a bypass. You MUST use the Skill tool to invoke `/implement`.
+
+4. **Producing a "summary" of what agents would have found instead of running them** — Review agents must actually run and return findings. Writing "the architecture review would find X" is not the same as spawning the Architecture Agent.
+
+**The test**: At each phase boundary, ask yourself: "Did I use the Skill tool or Agent tool to delegate this work, or did I do it inline?" If the answer is "inline" for any of Phase 0, Plan, or Implement, you have bypassed the workflow.
+
+**Why this matters**: The multi-agent approach exists because a single agent writing all code misses cross-cutting concerns that parallel specialist agents catch (security gaps, missing tests, broken API contracts, orphaned routes). Collapsing to a single agent defeats the purpose of the entire workflow.
+
 ---
 
 ## Anti-Hallucination Rules

@@ -27,6 +27,10 @@ Break the approved plan into implementation units (typically one per file or tig
 - Dependencies on other units (determines ordering)
 
 ### Step 2: Implement Independent Units in Parallel
+
+**CRITICAL — All code MUST be written by sub-agents, not inline:**
+You MUST use the Agent tool to spawn Code Agents and Test Agents. Do NOT write production code or test code directly using the Write/Edit tools. The entire point of this skill is multi-agent parallel implementation with specialist agents. Writing code inline bypasses the parallel review, the test-first mindset, and the cross-cutting checks that agents provide.
+
 For units with no dependencies on each other, spawn parallel agent pairs:
 
 **CRITICAL — Test Agents Are Not Optional:**
