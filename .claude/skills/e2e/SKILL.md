@@ -11,6 +11,32 @@ Referenced by `/implement` as a post-implementation step and `/pre-deploy` as a 
 
 ## Prerequisites (BLOCKING — do not skip)
 
+### E2E Framework Must Be Installed (BLOCKING — bootstrap if missing)
+
+Before anything else, verify the E2E test framework is installed and configured:
+
+1. **Check installation**: Run `npx playwright --version`. If it fails or `@playwright/test` is not in `package.json`:
+   - Install: `npm install -D @playwright/test`
+   - Install browsers: `npx playwright install --with-deps chromium`
+2. **Check config**: Verify `playwright.config.ts` exists (in project root or web app root). If missing, create one with:
+   - `testDir: './e2e'`
+   - `baseURL` from CLAUDE.md or `http://localhost:5173`
+   - `reporter: 'list'`
+   - `retries: 1`
+   - `use: { headless: true }`
+3. **Check test directory**: Verify `e2e/` directory exists. If missing, create it with a smoke test:
+   ```typescript
+   // e2e/smoke.spec.ts
+   import { test, expect } from '@playwright/test';
+   test('app loads', async ({ page }) => {
+     await page.goto('/');
+     await expect(page).toHaveTitle(/.+/);
+   });
+   ```
+4. **Verify**: Run `npx playwright test e2e/smoke.spec.ts` to confirm the framework works.
+
+**This check is MANDATORY and BLOCKING.** Do NOT skip E2E tests because the framework is not installed — install it. "Playwright not found" is never an acceptable reason to skip this skill.
+
 ### Dev Servers Must Be Running
 
 Check that the application's dev servers are alive before running any tests. Use the health check endpoints or URLs defined in CLAUDE.md.
@@ -55,7 +81,7 @@ npx playwright test --reporter=list
 - For failures, the framework may generate screenshots/artifacts
 - Capture: test names, pass/fail status, duration, and artifact paths for failures
 
-If the E2E framework is not installed, install it first.
+If the E2E framework is not installed, STOP and run the bootstrap from the Prerequisites section above before continuing. Do NOT skip this step.
 
 ### Step 3: Report Results
 

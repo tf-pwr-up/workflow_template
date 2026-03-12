@@ -50,6 +50,18 @@ Before any work begins, verify the repo has the infrastructure needed for autono
 
 7. **Git repo** — If not initialized, run `git init` and create an initial commit.
 
+8. **E2E test infrastructure (MANDATORY — do not skip)**:
+   - Check if `@playwright/test` is installed: `npx playwright --version` or check `package.json`
+   - If NOT installed:
+     1. Install Playwright: `npm install -D @playwright/test` (in the root or the web app package, per project convention)
+     2. Install browsers: `npx playwright install --with-deps chromium`
+     3. Create `playwright.config.ts` at the project root (or web app root) with sensible defaults (baseURL from CLAUDE.md or `http://localhost:5173`, `testDir: './e2e'`, reporter: list, retries: 1)
+     4. Create the `e2e/` directory if it doesn't exist
+     5. Create a smoke test file `e2e/smoke.spec.ts` that verifies the app loads (navigate to `/`, assert page title or root element)
+     6. Run the smoke test to verify the infrastructure works: `npx playwright test`
+   - If already installed: verify `playwright.config.ts` exists and `e2e/` directory exists. Create them if missing.
+   - This step is BLOCKING — the pipeline MUST NOT proceed to Phase A until E2E infrastructure is verified working. "No E2E framework" is never an acceptable reason to skip E2E tests in Phase B.
+
 This step is idempotent — running it on an already-bootstrapped repo does nothing.
 
 ---

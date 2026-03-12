@@ -56,14 +56,26 @@ Every implementation unit MUST have BOTH a Code Agent AND a Test Agent launched 
 - Follow the project's test file naming convention (see CLAUDE.md)
 - **A unit with code but no tests is incomplete and MUST NOT be committed**
 
-**E2E Test Agent** (runs once, after all units):
+**E2E Test Agent** (runs once, after all units — MANDATORY for batches with user-facing changes):
+
+**BLOCKING prerequisite — E2E infrastructure must exist:**
+Before writing any E2E tests, verify Playwright is installed and configured. If it is NOT:
+1. Install `@playwright/test` in the appropriate package
+2. Install browsers: `npx playwright install --with-deps chromium`
+3. Create `playwright.config.ts` with project-appropriate defaults
+4. Create the `e2e/` directory and a smoke test
+5. Run the smoke test to verify infrastructure works
+This bootstrap is MANDATORY — do NOT skip E2E tests because the framework isn't installed. Install it.
+
+**E2E test responsibilities:**
 - Review what features changed and determine which E2E tests need updating
 - For new user-facing features: add E2E tests covering the happy path
 - For changed behaviour: update existing E2E test assertions to match
 - For changed UI: update test selectors (text content, element selectors)
 - For schema changes: update seed data if new entity types or fields are needed
 - Follow patterns in existing E2E test files (see `/e2e` skill for conventions)
-- If no user-facing changes were made, skip this step
+
+**Skip conditions (narrow):** Only skip if the batch contains ZERO user-facing changes (e.g., purely backend refactoring with no API shape changes, or tooling-only changes). If in doubt, run E2E tests.
 
 ### Step 3: Dependent Units
 After independent units complete, implement dependent units in dependency order, again with parallel code+test agents.
@@ -95,7 +107,7 @@ After all units complete, run the Integration Agent:
 2. Type check the entire project (see CLAUDE.md for command)
 3. Lint check (see CLAUDE.md for command)
 4. Run all unit/integration tests (see CLAUDE.md for command)
-5. Run E2E tests if applicable (see /e2e skill; requires dev servers running)
+5. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
 6. **Test file count verification (BLOCKING)**:
    - Count the number of production files created/modified in this implementation
    - Count the number of test files created/modified
