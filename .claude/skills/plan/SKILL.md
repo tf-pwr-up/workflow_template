@@ -1,16 +1,22 @@
+---
+name: plan
+description: "Multi-Perspective Planning with parallel review agents."
+---
+
 # /plan — Multi-Perspective Planning
 
 Trigger: User wants to plan a new feature, change, or module.
 
-## Prerequisites (BLOCKING — do not skip)
+## Prerequisites (BLOCKING — do not skip, do not work around)
 
-Before producing any plan, verify Phase 0 has been completed:
+Before producing any plan, verify Phase 0 has been completed. **Do NOT produce a plan from memory or general knowledge — the gap list is the input.**
 
 1. Check for a gap list artifact: `ls docs/gaps/*.md`
 2. If no gap list exists, STOP and invoke `/phase-0` first. Tell the user: "Phase 0 (Feature Inventory & Gap Analysis) is required before planning. Running it now."
-3. If a gap list exists, read it and use it as input to the plan.
+3. If a gap list exists, **read it** and use it as the primary input to the plan. Do not plan from memory.
+4. If the gap list is stale (the codebase has changed significantly since it was created), re-run `/phase-0` to refresh it.
 
-The plan MUST reference specific items from the gap list. Every MISSING and PARTIAL item should map to plan steps.
+The plan MUST reference specific items from the gap list. Every MISSING and PARTIAL item should map to plan steps. A plan that doesn't reference gap list items is not a valid plan.
 
 ## Instructions
 

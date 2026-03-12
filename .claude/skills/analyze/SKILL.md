@@ -1,3 +1,8 @@
+---
+name: analyze
+description: "Deep Analysis & Documentation of a source codebase or spec."
+---
+
 # /analyze — Deep Analysis & Documentation
 
 Trigger: User wants to analyze a source (codebase, requirements, specs) to build implementation documentation.
