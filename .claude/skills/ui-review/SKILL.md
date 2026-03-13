@@ -5,6 +5,8 @@ description: "UI Quality Review (design system, states, responsive, dark mode, a
 
 # /ui-review — UI Quality Review
 
+I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
 Trigger: User invokes `/ui-review`, or automatically as part of `/review` and `/implement` for any user-facing changes.
 
 ## Purpose
@@ -33,6 +35,38 @@ Then read the project's actual design system config and global styles to underst
 
 Launch an Agent that checks the following categories:
 
+## Human Visibility Standard (BLOCKING)
+
+This is the most important check. **Every interactive element must be visible to a human user without any interaction.**
+
+A UI that looks clean but hides its controls is worse than an ugly UI where everything is obvious. Users cannot click what they cannot see.
+
+### Rules
+
+- **Buttons must not rely on hover states to become visible** — they must be clearly visible at rest
+- **Navigation links must be visually distinct from plain text** — use color, weight, underline, or background to differentiate
+- **Text contrast minimums**: 4.5:1 for normal text, 3:1 for large text (18px+) and UI components/graphical objects
+
+### Specific CSS Class Anti-Patterns to Flag as BLOCKING
+
+- `text-gray-400` or `text-gray-500` on `bg-white` or `bg-gray-50` backgrounds for interactive elements
+- `text-gray-500` for buttons without a background color
+- Any button or link that has no `bg-*`, `border-*`, or distinguishing visual treatment
+- Navigation items that are identical in appearance to body text
+
+### Required Visual Treatments for Interactive Elements
+
+- **Primary actions**: visible background color (e.g., `bg-blue-600 text-white`)
+- **Secondary actions**: visible border or background tint (e.g., `border border-gray-300` or `bg-gray-100`)
+- **Navigation links**: distinct color from body text, or underline, or font-weight difference
+- **Destructive actions**: red-tinted styling (`text-red-600` or `bg-red-*`)
+
+### The Squint Test
+
+If you squint and cannot tell which elements are clickable, the UI fails this check. This is a **BLOCKING** failure.
+
+---
+
 #### A. Design System Compliance
 
 Check that the code uses the project's established design system shortcuts, components, and tokens — not raw/inline equivalents:
@@ -51,14 +85,16 @@ To identify what shortcuts exist, read the project's CSS config file and global 
 
 #### B. Visual States
 
-Every data-fetching component must handle all states. Check for:
+Every data-fetching component must handle all states. This is not optional polish — it is core functionality. A page that shows blank space while loading, or nothing when there is no data, is broken — not "could be improved."
 
-1. **Loading** — shows a loading indicator (skeleton, spinner, etc.), not blank space
+Every data-fetching view **MUST** have:
+
+1. **Loading** — shows a loading indicator (skeleton preferred, spinner is the minimum), not blank space
 2. **Empty** — shows a helpful empty state with message and CTA, not just nothing
-3. **Error** — shows error message, offers retry or navigation
+3. **Error** — shows error message with retry action or navigation path
 4. **Success** — renders data correctly
 
-Missing states = **SHOULD FIX**. A page that shows nothing while loading or when empty is a poor experience.
+Missing states = **BLOCKING**. A page that shows nothing while loading or when empty is a broken experience that ships confusion to users.
 
 #### C. Responsive Behaviour
 
@@ -110,11 +146,16 @@ Major visual divergence from reference = **SHOULD FIX** with specific details of
 
 1. **Form labels** — every input has a `<label>` with matching `for`/`id`
 2. **Alt text** — images have `alt` attributes
-3. **Focus visible** — interactive elements have visible focus styles
+3. **Focus indicators** — keyboard users must be able to see which element is focused; interactive elements must have visible focus styles (e.g., `focus:ring-2` or equivalent)
 4. **Semantic HTML** — uses `<button>` for actions (not `<div onClick>`), `<a>` for navigation
-5. **Colour contrast** — text on coloured backgrounds meets minimum contrast
+5. **Colour contrast** — text on coloured backgrounds meets minimum contrast ratios (4.5:1 normal text, 3:1 large text)
+6. **Clickable area size** — interactive elements must be at least 44x44px (mobile tap target minimum per WCAG)
+7. **Semantic color usage** — do not rely on color alone to convey meaning; use icons, text, or patterns alongside color
+8. **Missing labels** — form inputs without labels or `aria-label` attributes
 
-Accessibility violation = **SHOULD FIX**.
+Contrast violations = **BLOCKING**.
+Missing form labels = **BLOCKING**.
+Other accessibility violations = **SHOULD FIX**.
 
 #### H. Icons & Visual Polish
 
@@ -123,12 +164,25 @@ Accessibility violation = **SHOULD FIX**.
 3. **Transitions** — interactive elements have smooth state change transitions
 4. **Loading indicators** — async actions show a spinner or disabled state while pending
 
+#### I. Navigation Completeness
+
+Every feature and page must be reachable through the UI navigation. Features that can only be reached by typing a URL directly are broken.
+
+1. **Main navigation** — check that the main nav, sidebar, or dashboard has links to all major sections of the app
+2. **Sub-navigation** — pages with child routes must have tabs, breadcrumbs, or equivalent sub-nav
+3. **Route coverage** — cross-reference defined routes against navigation links; every route should be reachable from at least one nav element
+4. **Link visibility** — every nav link must be clearly visible and distinguishable (see Human Visibility Standard above)
+5. **Orphan pages** — pages with no inbound navigation link are **BLOCKING** failures
+
+Features that can only be reached by typing a URL = **BLOCKING**.
+Missing sub-navigation on pages with child routes = **SHOULD FIX**.
+
 ### Step 3: Report
 
 Present findings grouped by severity:
 
-- **BLOCKING** — broken layout, overflow, unusable on mobile, missing critical visual state
-- **SHOULD FIX** — inconsistent design tokens, missing dark mode, no empty/loading states, accessibility gaps, reference divergence
+- **BLOCKING** — broken layout, overflow, unusable on mobile, invisible interactive elements, missing visual states (loading/empty/error), unreachable pages or features, contrast violations, missing form labels. **If a real user would struggle to find or use a feature, it is BLOCKING — not a suggestion.**
+- **SHOULD FIX** — inconsistent design tokens, missing dark mode, accessibility gaps beyond contrast/labels, reference divergence, missing sub-navigation
 - **CONSIDER** — minor spacing differences, polish opportunities, animation suggestions
 
 Each finding must cite the specific file, line, the issue, and what the fix should be.

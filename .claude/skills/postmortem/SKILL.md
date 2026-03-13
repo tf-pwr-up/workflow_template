@@ -3,6 +3,12 @@ name: postmortem
 description: "Bug Postmortem & Workflow Improvement after finding a bug."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Every bug is a failure of craftsmanship. The postmortem exists to ensure the same failure never happens again.
+
 # /postmortem — Bug Postmortem & Workflow Improvement
 
 Trigger: A bug is found (by user report, E2E failure, or manual testing). This skill analyses the root cause and strengthens the workflow to prevent the same class of bug from recurring.
@@ -42,6 +48,9 @@ Categorise the root cause into one or more of these patterns:
 | **Missing system field** | UI doesn't expose a field the API requires, or API doesn't validate a field the UI sends | Create form had no name input but API requires name |
 | **Stale selector** | UI text or structure changed but E2E test selectors weren't updated | Test looked for old text but content was renamed |
 | **State isolation** | Tests or features depend on shared mutable state without proper reset | Destructive operation broke shared state for subsequent tests |
+| **Shallow test** | Tests exist but don't verify behaviour (typeof checks, page-load-only E2E) | Unit test checked `typeof Component === 'function'` — component was completely broken but test passed |
+| **Invisible UI** | Interactive elements exist in DOM but are invisible or indistinguishable to users (low contrast, no background, hover-only visibility) | Button used `text-gray-500` on white background — invisible until hover |
+| **Missing visual state** | Feature has no loading, empty, or error state — shows blank page or spinner forever | Config endpoint returned 404, frontend showed infinite loading spinner |
 
 If the bug doesn't fit these patterns, create a new pattern category.
 

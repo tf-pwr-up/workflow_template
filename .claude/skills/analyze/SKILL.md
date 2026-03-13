@@ -3,6 +3,12 @@ name: analyze
 description: "Deep Analysis & Documentation of a source codebase or spec."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Analysis is the foundation everything else builds on. A thorough analysis means every downstream agent has the context to deliver excellent work. A lazy analysis means bugs, gaps, and rework.
+
 # /analyze — Deep Analysis & Documentation
 
 Trigger: User wants to analyze a source (codebase, requirements, specs) to build implementation documentation.

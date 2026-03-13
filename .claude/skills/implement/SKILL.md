@@ -7,6 +7,12 @@ description: "Parallel Code + Test Implementation with integration checks."
 
 Trigger: User approves a plan and wants implementation to begin.
 
+## Craftsmanship Standard (applies to ALL agents spawned by this skill)
+
+**I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.**
+
+Every Code Agent, Test Agent, E2E Test Agent, and Integration Agent spawned by this skill operates under this standard. There is no "good enough for now." Every file you write will be used by real people. Write it as if you are personally responsible for every bug, every invisible button, every test that proves nothing.
+
 ## Prerequisites (BLOCKING — do not skip, do not work around)
 
 **ALL THREE must be satisfied before writing ANY production code.** If any prerequisite is missing, you MUST stop and fulfill it first. Do not proceed "just this once" or "to save time."
@@ -45,6 +51,11 @@ Every implementation unit MUST have BOTH a Code Agent AND a Test Agent launched 
 - Follow project conventions from CLAUDE.md
 - If a reference implementation is defined in CLAUDE.md, read it (READ-ONLY) when needed for implementation details
 - Ensure language/framework strict mode compliance
+- Write production-quality code that a real user will interact with
+- Every UI component must handle loading, empty, error, and success states
+- Every interactive element must be visually distinguishable — use sufficient contrast, proper sizing, visible text
+- Never use text-gray-400/text-gray-500 for buttons or interactive links on light backgrounds — these are invisible to users
+- Forms must actually submit data to the API and handle the response
 - Do NOT write tests
 
 **Test Agent** (per unit — MANDATORY, not optional):
@@ -55,15 +66,38 @@ Every implementation unit MUST have BOTH a Code Agent AND a Test Agent launched 
 - For services: test business logic, state transitions, error handling
 - Follow the project's test file naming convention (see CLAUDE.md)
 - **A unit with code but no tests is incomplete and MUST NOT be committed**
+- Tests MUST verify behaviour, not just existence
+- NEVER write tests that just check `typeof X === 'function'` or `expect(Component).toBeDefined()` — these prove nothing
+- Unit tests for components must: render the component with realistic props, interact with it (fill forms, click buttons), and verify the output changes correctly
+- Unit tests for API calls must: make real requests (or use app.request() for Hono), verify response status codes AND response body shapes
+- If your test would pass even when the feature is completely broken, your test is worthless — rewrite it
 
-**E2E Test Agent** (runs once, after all units):
+**E2E Test Agent** (runs once, after all units — MANDATORY for batches with user-facing changes):
+
+**CRITICAL — E2E means REAL servers, NO mocking:**
+E2E tests MUST hit real running frontend and API servers. They MUST NOT use `page.route()`, MSW, nock, or any other mechanism to mock API responses. If you mock the API, you are writing frontend integration tests, not E2E tests. The `/e2e` skill defines this requirement in detail — read it.
+
+**BLOCKING prerequisites — all must be satisfied:**
+1. **Playwright installed**: If not, install `@playwright/test`, browsers, create config and test directory.
+2. **Full-stack connectivity**: Frontend and API dev servers must BOTH be running, and the frontend must be able to reach the API (via proxy, CORS, or shared origin). If the project has separate frontend/API servers and no dev proxy is configured, **configure one** (e.g. Vite `server.proxy` in `vite.config.ts`) before writing any tests.
+3. **Seed data**: A mechanism to populate known test data via the real API must exist. If it doesn't, create a seed script or global setup that calls real API endpoints to create test fixtures.
+4. **Auth via real API**: Tests must authenticate by calling the real auth endpoint (not by injecting fake tokens). Create or use a test-only auth helper that obtains real session tokens from the API.
+
+**E2E test responsibilities:**
 - Review what features changed and determine which E2E tests need updating
-- For new user-facing features: add E2E tests covering the happy path
+- For new user-facing features: add E2E tests covering the happy path against real servers
 - For changed behaviour: update existing E2E test assertions to match
 - For changed UI: update test selectors (text content, element selectors)
-- For schema changes: update seed data if new entity types or fields are needed
-- Follow patterns in existing E2E test files (see `/e2e` skill for conventions)
-- If no user-facing changes were made, skip this step
+- For schema changes: update seed data script to include new types/fields
+- Follow the `/e2e` skill for conventions — especially the no-mocking rule
+- E2E tests must be USER JOURNEY tests that complete full workflows through the UI
+- Navigate via clicks and links, not direct page.goto() to interior pages
+- Fill real forms with real data, submit them, verify the data appears correctly
+- Test that created items appear in lists, can be edited, can be deleted
+- A test that just goes to a URL and checks the page container is visible is a smoke test, not an E2E test
+- **Golden Path requirement**: For each batch with user-facing features, at least one E2E test must complete the full create → view → edit → verify cycle
+
+**Skip conditions (narrow):** Only skip if the batch contains ZERO user-facing changes (e.g., purely backend refactoring with no API shape changes, or tooling-only changes). If in doubt, run E2E tests.
 
 ### Step 3: Dependent Units
 After independent units complete, implement dependent units in dependency order, again with parallel code+test agents.
@@ -75,6 +109,22 @@ If any implementation unit includes frontend page or component files, run the UI
 - Checks design system compliance, visual states, responsive behaviour, dark mode, consistency, reference comparison, accessibility
 - See `.claude/skills/ui-review.md` for the complete checklist
 - Fix any BLOCKING issues immediately; SHOULD FIX issues before integration check
+
+### Step 3a-ii: Human Visibility Check (MANDATORY for UI changes)
+
+For every new or changed UI component, perform a code-level review of CSS/utility classes to verify interactive elements are visible to users. This is a file-reading step, not a browser test.
+
+**For every interactive element (button, link, nav item, tab, form control), verify:**
+
+1. **Visible without hover**: The element must be visually distinct in its default state. Elements that only become visible on hover are invisible to most users.
+2. **Sufficient text contrast**: Text on interactive elements must have adequate contrast against its background.
+   - On white/light backgrounds: NO `text-gray-400`, `text-gray-500`, or lighter. Use `text-gray-700` or darker for readable text, or use colored text (`text-blue-600`, etc.) for links.
+   - On dark backgrounds: NO `text-gray-600` or darker.
+3. **Buttons use visible styling**: Buttons must use `bg-*` classes (filled style) or `border` + visible `text-*` combinations (outline style). A button with only `text-gray-400` and no background/border is invisible.
+4. **Navigation items are clearly clickable**: Nav items must be visually distinguishable from plain text — via color, underline, icon, background, or other affordance.
+5. **Proper sizing**: Interactive elements must be large enough to click/tap. No tiny click targets.
+
+**This check is BLOCKING.** If any interactive element would be invisible or indistinguishable from non-interactive text, fix it before proceeding.
 
 ### Step 3b: Smoke Wiring Check (MANDATORY — runs before full integration)
 
@@ -95,7 +145,8 @@ After all units complete, run the Integration Agent:
 2. Type check the entire project (see CLAUDE.md for command)
 3. Lint check (see CLAUDE.md for command)
 4. Run all unit/integration tests (see CLAUDE.md for command)
-5. Run E2E tests if applicable (see /e2e skill; requires dev servers running)
+5. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
+   E2E tests must include at least one user journey test per feature (not just page-load checks). If all E2E tests are of the form "goto URL, check element visible", they are insufficient — add journey tests.
 6. **Test file count verification (BLOCKING)**:
    - Count the number of production files created/modified in this implementation
    - Count the number of test files created/modified
@@ -111,6 +162,11 @@ After all units complete, run the Integration Agent:
    - For create/edit forms, verify every required API field has a UI input (including system fields)
    - For page components, verify each is registered in the router
    - For every link in new/changed code, verify it matches a route pattern in the router
+9. **Verify UI element visibility (BLOCKING)**:
+   - For every new button, link, or nav item, check that the CSS/utility classes provide sufficient contrast against the background
+   - Flag any interactive element using text-gray-400/text-gray-500 on light backgrounds as BLOCKING
+   - Flag any interactive element using text-gray-600 or darker text on dark backgrounds as BLOCKING
+   - This is the final gate — no invisible UI ships
 ```
 
 If E2E tests fail due to changed UI or behaviour, fix the E2E tests to match the new implementation. If E2E tests fail due to bugs in the implementation, fix the implementation.
