@@ -3,6 +3,12 @@ name: phase-0
 description: "Feature Inventory & Gap Analysis. MANDATORY before any planning or implementation."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Phase 0 sets the foundation. A thorough inventory means nothing gets missed. A lazy inventory means features slip through and users suffer.
+
 # /phase-0 — Feature Inventory & Gap Analysis
 
 Trigger: MANDATORY before any planning or implementation. This skill MUST run before `/plan` or `/implement`.

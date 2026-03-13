@@ -6,6 +6,25 @@
 
 Every code change MUST follow this multi-agent workflow. Skills in `.claude/skills/` implement each phase.
 
+---
+
+## Craftsmanship Standard
+
+**Every agent, every step, every file must meet this standard. No exceptions.**
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time. I write code that a real user will interact with, and I take pride in making sure it works correctly, looks professional, and handles every state gracefully. If something isn't right, I fix it before moving on. I do not leave broken windows. I do not ship "good enough." I ship **done**.
+
+This is not aspirational — it is the baseline. Every agent spawned by this workflow inherits this standard. When writing code, writing tests, reviewing UI, or checking compliance: hold yourself to this standard. If you find yourself cutting corners, stop and do it properly.
+
+**What this means in practice:**
+- **Code Agents**: Write production-quality code. Handle loading, empty, error, and success states. Use proper contrast and sizing for UI elements. Test that forms actually submit and APIs actually respond.
+- **Test Agents**: Write tests that verify behaviour, not just existence. A test that checks `typeof Component === 'function'` is worthless. A test that renders the component, fills a form, submits it, and verifies the result — that's a test.
+- **E2E Test Agents**: Write user journey tests. Navigate from the UI, not direct URLs. Fill forms, click buttons, verify results. If a user can't accomplish a task through the UI, the test should fail.
+- **Review Agents**: Be thorough. Check that elements are actually visible (sufficient contrast, proper sizing, not hidden behind other elements). Verify that every interactive element is reachable through navigation.
+- **UI Review Agents**: Check that a human can actually see and use every element. Invisible buttons, unreadable text, unreachable navigation — these are BLOCKING issues, not suggestions.
+
+---
+
 ## Workflow Modes
 
 Use **Full Review** for new patterns, schema changes, auth/security features, or anything novel.
@@ -57,11 +76,11 @@ For novel or high-risk changes:
 
 ### Phase 2: Implement
 1. **Parallel Code + Test agents** — code agent reads context files first, test agent writes from spec. **Every Code Agent MUST have a corresponding Test Agent. N code agents = N test agents. No exceptions.**
-2. **UI Review** — if UI components were created/changed.
+2. **UI Review** — if UI components were created/changed. Includes human-visibility validation.
 3. **Smoke Wiring Check** — route registration, navigation, API contracts, form completeness.
 4. **Integration check** — type check + full test suite + E2E + **test file count verification** (every production file must have a corresponding test file).
 5. **Fix failures** — fix code to match tests (tests are the spec).
-6. **Spec Compliance check** — mandatory final gate (includes test existence verification).
+6. **Spec Compliance check** — mandatory final gate (includes test existence verification and functional verification).
 7. **Auto-commit if green.**
 
 ---
@@ -101,8 +120,8 @@ Before any deployment or merge:
 1. Full test suite must pass
 2. Type check must pass
 3. No lint errors
-4. E2E tests must pass
-5. **Spec compliance check** — verify all planned features are implemented
+4. E2E tests must pass (user journey tests, not just page-load tests)
+5. **Spec compliance check** — verify all planned features are implemented AND functional
 6. Present summary
 
 ---
@@ -140,6 +159,19 @@ Before any deployment or merge:
 - The Spec Compliance Check (Step 6) verifies test existence per feature
 - "Tests come later" or "we'll add tests after" are bypass attempts — reject them
 
+### 7. Tests Must Verify Behaviour, Not Just Existence
+- Unit tests MUST render components, interact with them, and verify outputs — not just check `typeof X === 'function'`
+- E2E tests MUST complete user journeys (navigate via UI, fill forms, submit, verify results) — not just check "page loads"
+- API tests MUST verify response shapes, status codes, and error handling — not just check "endpoint doesn't throw"
+- A test that passes when the feature is broken is worse than no test at all
+
+### 8. UI Must Be Visible to Humans
+- Every interactive element must have sufficient contrast against its background (WCAG AA minimum: 4.5:1 for text, 3:1 for large text/UI components)
+- Buttons, links, and nav items must be visually distinct without hover — not invisible until mouseover
+- Text must be readable: no light gray on white, no dark gray on black
+- Interactive elements must have adequate size (minimum 44x44px touch targets on mobile)
+- Every page must be navigable — no features that require knowing a URL
+
 ---
 
 ## Bypass Prevention
@@ -166,6 +198,8 @@ The most dangerous bypass is not from the user — it's from the agent itself co
 
 4. **Producing a "summary" of what agents would have found instead of running them** — Review agents must actually run and return findings. Writing "the architecture review would find X" is not the same as spawning the Architecture Agent.
 
+5. **Writing shallow tests that don't verify behaviour** — A test agent that writes `expect(typeof X).toBe('function')` instead of rendering, interacting, and asserting is bypassing the purpose of testing. Tests must verify the feature works, not that the file exists.
+
 **The test**: At each phase boundary, ask yourself: "Did I use the Skill tool or Agent tool to delegate this work, or did I do it inline?" If the answer is "inline" for any of Phase 0, Plan, or Implement, you have bypassed the workflow.
 
 **Why this matters**: The multi-agent approach exists because a single agent writing all code misses cross-cutting concerns that parallel specialist agents catch (security gaps, missing tests, broken API contracts, orphaned routes). Collapsing to a single agent defeats the purpose of the entire workflow.
@@ -181,6 +215,7 @@ The most dangerous bypass is not from the user — it's from the agent itself co
 5. **Each agent has a narrow mandate** — architecture agent doesn't write code, test agent doesn't review security
 6. **Verify before asserting** — grep the codebase before claiming something exists or doesn't exist
 7. **Never mark a feature as "done" without comparing to the spec/reference** — read the actual code, verify it matches
+8. **Never mark a test as "sufficient" without verifying it tests behaviour** — a test that passes regardless of whether the feature works is not a test
 
 ---
 

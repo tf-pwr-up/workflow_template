@@ -3,6 +3,12 @@ name: pre-deploy
 description: "Pre-Deployment Gate Check (tests, types, lint, security, spec compliance)."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Pre-deploy is the last gate. If it passes, users will interact with this code. Hold it to the highest standard.
+
 # /pre-deploy — Pre-Deployment Gate Check
 
 Trigger: User wants to verify the project is ready for deployment or merge.
@@ -44,6 +50,7 @@ Spawn parallel agents for:
 - Report pass/fail counts and any failures with artifact paths
 - A single failure = NOT READY verdict
 - See `/e2e` skill for full details
+- Verify E2E tests include user journey tests (not just page-load checks). If all E2E tests are of the form 'goto URL, check element visible', flag as WARNING — these tests provide false confidence.
 
 **Spec Compliance Agent (MANDATORY — do not omit):**
 - Read the latest gap list from `docs/gaps/`
@@ -51,6 +58,8 @@ Spawn parallel agents for:
 - For every route in the router: verify there's a navigation link to reach it
 - For every implemented feature: verify tests exist
 - Output: PASS/WARN/FAIL per item
+- For every user-facing feature, verify the E2E test exercises a complete workflow, not just page visibility
+- For every form, verify the test submits data and verifies the result
 - A single FAIL = NOT READY verdict
 
 ### Step 2: Regression Check

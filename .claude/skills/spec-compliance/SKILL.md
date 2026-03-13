@@ -3,6 +3,12 @@ name: spec-compliance
 description: "Verify implementation matches spec (reachability, contracts, tests)."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Spec compliance means the feature WORKS for a real user — not just that the code exists. A page that renders but can't be reached, a form that displays but can't submit, a button that exists but can't be seen — these are all FAIL.
+
 # /spec-compliance — Verify Implementation Matches Spec
 
 Trigger: After implementation, before commit. Also invocable standalone to check current state.
@@ -30,8 +36,9 @@ For each item:
 1. **Check if code exists** — read actual files, don't assume
 2. **Check if behaviour matches** — for UI features, verify the component renders the right elements, handles the right interactions, shows the right states
 3. **Check if it's reachable** — for routes/pages, verify there's a navigation path (link, button, menu item) that takes the user there. An unreachable route is NOT complete.
-4. **Check if unit tests exist** — verify test file covers the feature
-5. **Check if E2E tests exist** — for user-facing features, verify there's at least one E2E test covering the happy path. Check that E2E test assertions match current UI text and selectors.
+4. **Check if unit tests verify behaviour** — verify test file covers the feature AND contains meaningful assertions (not just import/typeof checks). A test file that only checks exports is equivalent to having no tests — mark as FAIL.
+5. **Check if E2E tests verify user journeys** — for user-facing features, verify there's at least one E2E test that completes a full workflow (navigate → interact → verify result). A test that just checks 'page loads' is not sufficient — mark as WARN.
+6. **Check if it's functional** — for forms, verify they submit data to a real API endpoint. For CRUD features, verify create/read/update/delete all work end-to-end. For navigation, verify the user can reach the feature through UI clicks. A feature that exists but doesn't work is NOT complete — it's FAIL.
 
 Classify each item:
 - `PASS` — implemented, matches spec, reachable, unit tested, E2E tested (if user-facing)

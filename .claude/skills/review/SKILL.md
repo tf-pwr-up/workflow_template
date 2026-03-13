@@ -3,6 +3,12 @@ name: review
 description: "Multi-Perspective Code Review (architecture, security, performance, tests, UI)."
 ---
 
+## Craftsmanship Standard
+
+> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
+
+Every review agent must hold the code to this standard. Code that "works" but is invisible to users, untestable, or unreachable through navigation is NOT acceptable.
+
 # /review — Multi-Perspective Code Review
 
 Trigger: User wants a review of existing or changed code.
@@ -28,6 +34,8 @@ When the user invokes `/review` (optionally with a file path or description):
 - Are there unnecessary abstractions or missing patterns?
 - Is the code consistent with adjacent files?
 - Any dead code, unused imports, or redundant logic?
+- Check that every UI feature is reachable through navigation — not just registered as a route
+- Check that interactive elements (buttons, links, nav items) are visually distinct from plain text
 - **API contract alignment**: Do frontend API calls match the actual backend response shapes? Account for any response transformation/unwrapping the API client performs.
 - **Form binding**: Are form components that serve both create and edit modes properly controlled? Do they accept live values from the parent, not just read from a potentially-null entity?
 - **Link construction**: Do link `href` values match route patterns in the router? Are all required URL segments included?
@@ -58,6 +66,9 @@ When the user invokes `/review` (optionally with a file path or description):
 - For user-facing changes: are E2E tests updated to match?
 - Do existing E2E test selectors still match the current UI text and structure?
 - If new features were added, is there at least one E2E test covering the happy path?
+- Verify tests check BEHAVIOUR, not just existence. A test that imports a component and checks `typeof X === 'function'` proves nothing. Flag as SHOULD FIX.
+- Verify E2E tests complete user journeys, not just page loads. A test that navigates to a URL and checks `#app` is visible proves nothing. Flag as SHOULD FIX.
+- For every user-facing feature, verify at least one E2E test exercises the full workflow (navigate → interact → verify result)
 
 ### Step 3: Consolidate & Report
 Present findings grouped by severity:
