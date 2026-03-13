@@ -121,6 +121,54 @@ test('shows loading state and handles API errors gracefully', async ({ page }) =
 });
 ```
 
+## Minimum Coverage Requirements (BLOCKING — enforced at pre-deploy and per-batch)
+
+E2E test suites MUST meet these minimum requirements. A suite that falls short is INSUFFICIENT and blocks deployment.
+
+### Required Test Categories
+
+Every project must have E2E tests in ALL of these categories:
+
+| Category | Minimum Tests | What It Proves |
+|----------|--------------|----------------|
+| **Golden Path** | 1 per primary entity type | Full CRUD lifecycle works end-to-end (create → view → edit → verify → delete) |
+| **Auth Journeys** | 2 | Login flow works; protected pages enforce access control |
+| **Navigation Journeys** | 3 | Key pages are reachable through UI clicks (not direct URLs); breadcrumbs/back work |
+| **Form Submission** | 1 per create/edit form | Forms submit real data to the API, data persists, success feedback shown |
+| **Data Verification** | included in above | Created/edited data appears correctly in list views and detail views |
+
+### What Counts as a Journey Test
+
+A test qualifies as a **journey test** if it does ALL of these:
+1. **Interacts with UI elements** — clicks buttons, fills forms, navigates links
+2. **Submits data or triggers state changes** — not just reading/viewing
+3. **Verifies the outcome** — checks that data was created/updated/deleted, not just that a page loaded
+4. **Spans multiple pages or states** — tests a workflow, not a single page render
+
+### What Does NOT Count
+
+These are smoke tests, not journey tests. They provide near-zero confidence:
+- `page.goto(url)` + `expect(element).toBeVisible()` — proves the page renders, nothing more
+- Checking that a heading contains text — proves the component exists, not that it works
+- Checking that a table exists without verifying its data content
+- Checking element counts without verifying element content
+
+### Verification Method
+
+At E2E quality gate (pre-deploy Step E3, or per-batch integration check), classify each test:
+
+```
+For each test in e2e/**/*.spec.ts:
+  - Does it call page.fill(), page.click() on forms, or page.selectOption()? → INTERACTION
+  - Does it make assertions on data content (not just element visibility)? → DATA_VERIFICATION
+  - Does it span more than one page navigation? → MULTI_PAGE
+
+  Journey test = INTERACTION + DATA_VERIFICATION
+  Smoke test = everything else
+```
+
+**BLOCKING**: If journey_test_count < 5 OR journey_test_count < smoke_test_count, the E2E suite is INSUFFICIENT. Write more journey tests before proceeding.
+
 ## Golden Path Test Suite
 
 Every project MUST have a dedicated golden path test file (e.g. `golden-path.spec.ts`) that exercises the core user workflow end-to-end in a single continuous flow.
