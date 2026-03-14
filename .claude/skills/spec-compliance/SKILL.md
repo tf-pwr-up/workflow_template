@@ -36,8 +36,17 @@ For each item:
 1. **Check if code exists** — read actual files, don't assume
 2. **Check if behaviour matches** — for UI features, verify the component renders the right elements, handles the right interactions, shows the right states
 3. **Check if it's reachable** — for routes/pages, verify there's a navigation path (link, button, menu item) that takes the user there. An unreachable route is NOT complete.
-4. **Check if unit tests verify behaviour** — verify test file covers the feature AND contains meaningful assertions (not just import/typeof checks). A test file that only checks exports is equivalent to having no tests — mark as FAIL.
-5. **Check if E2E tests verify user journeys** — for user-facing features, verify there's at least one E2E test that completes a full workflow (navigate → interact → verify result). A test that just checks 'page loads' is not sufficient — mark as WARN.
+4. **Check if unit tests verify behaviour** — verify test file covers the feature AND contains meaningful assertions (not just import/typeof checks). A test file that only checks exports is equivalent to having no tests — mark as FAIL. Specifically:
+   - For page components: test must render the page, simulate user interactions (clicks, form fills), and verify rendered output changes. Just checking `toBeInTheDocument()` is NOT sufficient.
+   - For hooks/stores: test must call the hook/store functions and verify return values, state changes, and side effects.
+   - For API routes: test must make HTTP requests and verify both status codes AND response body content.
+   - For utilities: test must call functions with varied inputs (including edge cases) and verify outputs.
+   - **Read the test file content** — do not just check if the file exists. Open it and verify it contains real assertions.
+5. **Check if E2E tests verify user journeys** — for user-facing features, verify there's at least one E2E test that completes a full workflow (navigate → interact → verify result). A test that just checks 'page loads' is not sufficient — mark as WARN. Specifically check for:
+   - At least one test per create form that fills and submits data
+   - At least one test per edit flow that modifies and saves data
+   - At least one error handling test (invalid input, unauthorized access)
+   - At least one test that verifies data persistence after creation/edit
 6. **Check if it's functional** — for forms, verify they submit data to a real API endpoint. For CRUD features, verify create/read/update/delete all work end-to-end. For navigation, verify the user can reach the feature through UI clicks. A feature that exists but doesn't work is NOT complete — it's FAIL.
 
 Classify each item:
