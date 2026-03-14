@@ -26,6 +26,20 @@ This standard applies to the ENTIRE pipeline. Every agent spawned by /build — 
 - Every feature must be reachable through navigation
 - Forms must submit, APIs must respond, data must persist
 
+## Build Modes
+
+Before beginning, determine the build mode. This affects where E2E tests run:
+
+- **Greenfield**: Building a new application from scratch across multiple batches. Frontend and backend are built in different batches, so per-batch E2E is structurally impossible (you can't E2E test a frontend against an API that doesn't exist yet). E2E tests run once at pre-deploy, after the full stack is assembled.
+- **Incremental**: Adding features to an existing, deployed application. The baseline app already works, so each batch can be E2E tested against the running stack.
+
+**How to determine:**
+- If the project has no functional routes, no working API, or the gap list shows >50% MISSING → **Greenfield**
+- If the project is deployed and the build adds/modifies specific features → **Incremental**
+- **If unclear, ASK the user** during Phase A: "Is this a greenfield build or incremental? This determines whether E2E tests run per-batch or at pre-deploy."
+
+The build mode is logged in `docs/plans/YYYY-MM-DD-build.md` and referenced by `/implement` and `/pre-deploy`.
+
 ## Instructions
 
 ### Phase 0: Bootstrap (runs once per repo, idempotent)
@@ -63,35 +77,43 @@ Before any work begins, verify the repo has the infrastructure needed for autono
 
 7. **Git repo** — If not initialized, run `git init` and create an initial commit.
 
-8. **E2E test infrastructure (MANDATORY — do not skip)**:
+8. **E2E test infrastructure (install framework — verification happens later)**:
    - Check if `@playwright/test` is installed: `npx playwright --version` or check `package.json`
    - If NOT installed:
      1. Install Playwright: `npm install -D @playwright/test` (in the root or the web app package, per project convention)
      2. Install browsers: `npx playwright install --with-deps chromium`
      3. Create `playwright.config.ts` at the project root (or web app root) with sensible defaults (baseURL from CLAUDE.md or `http://localhost:5173`, `testDir: './e2e'`, reporter: list, retries: 1)
      4. Create the `e2e/` directory if it doesn't exist
-     5. Create a smoke test file `e2e/smoke.spec.ts` that verifies the app loads (navigate to `/`, assert page title or root element)
-     6. Run the smoke test to verify the infrastructure works: `npx playwright test`
    - If already installed: verify `playwright.config.ts` exists and `e2e/` directory exists. Create them if missing.
-   - This step is BLOCKING — the pipeline MUST NOT proceed to Phase A until E2E infrastructure is verified working. "No E2E framework" is never an acceptable reason to skip E2E tests in Phase B.
+   - **For greenfield builds**: Do NOT attempt to run E2E smoke tests here — the app doesn't exist yet. Playwright installation and config are sufficient. E2E tests will be written and run at pre-deploy after all batches complete.
+   - **For incremental builds**: Run a smoke test (`npx playwright test`) to verify the existing app works with the E2E framework. This is BLOCKING — the pipeline MUST NOT proceed until E2E infrastructure is verified working.
 
-9. **Local dev connectivity (MANDATORY — do not skip)**:
-   E2E tests must hit REAL servers — not mocked APIs. This step ensures the full stack can run locally.
+9. **Local dev connectivity (verify architecture, defer full verification for greenfield)**:
+   E2E tests must eventually hit REAL servers — not mocked APIs. This step ensures the infrastructure is understood and configured.
    - **Identify architecture**: Read project config to determine if frontend and API are served from the same origin or separate servers.
    - **If separate servers** (e.g. Vite frontend + Wrangler/Express API):
      1. Verify a dev proxy is configured so the frontend can reach the API. Check `vite.config.ts` for `server.proxy`, or check for `VITE_API_URL` / equivalent env var.
      2. If NO proxy exists: **configure one**. For Vite, add `server.proxy` entries in `vite.config.ts` that forward API paths (e.g. `/auth`, `/config`, `/entities`, `/health`) to the API server URL.
-     3. Verify both servers can start: run the frontend and API dev commands and confirm both respond.
-     4. Verify connectivity: from the frontend's base URL, hit an API endpoint (e.g. `/health`) and confirm JSON is returned, not HTML.
-   - **If same origin**: verify the single dev server starts and serves both API and assets.
-   - **Seed data**: Verify or create a mechanism to populate known test data via the real API. E2E tests need known state — not mocked fixtures.
-   - This step is BLOCKING — the pipeline MUST NOT proceed until the full stack runs locally and the frontend can reach the API. "API is hard to start" is not a reason to mock — it's a bug to fix.
+   - **If same origin**: note the single dev server command.
+   - **For greenfield builds**: Server startup verification is deferred to pre-deploy (servers may not work until backend batches are complete). Document the expected dev commands in CLAUDE.md so pre-deploy knows how to start them.
+   - **For incremental builds**: Verify both servers can start and the frontend can reach the API. This is BLOCKING.
+   - **Seed data**: For greenfield, note that a seed script must be created during or after the batch that completes the API. For incremental, verify seed data mechanism exists now.
 
 This step is idempotent — running it on an already-bootstrapped repo does nothing.
 
 ---
 
 ### Phase A: Spec & Plan (Interactive — user participates)
+
+#### Step A0: Determine Build Mode
+
+Before gap analysis, determine and confirm the build mode with the user:
+
+1. **Auto-detect**: Check the gap list (if it exists) or the codebase state:
+   - No functional routes, no working API, or >50% MISSING items → suggest **Greenfield**
+   - Deployed app with specific features being added → suggest **Incremental**
+2. **Confirm with user**: "This looks like a **[greenfield/incremental]** build. Greenfield defers E2E tests to pre-deploy (the full stack doesn't exist yet). Incremental runs E2E per-batch (the baseline app already works). Confirm or override?"
+3. **Log the mode**: The build mode is recorded in `docs/plans/YYYY-MM-DD-build.md` and passed to `/implement` and `/pre-deploy`.
 
 #### Step A1: Comprehensive Gap Analysis
 
@@ -148,10 +170,10 @@ Before implementing, do a quick sanity check:
 
 Run the `/implement` skill for this batch with these overrides:
 - **Skip prerequisite checks** — the master plan IS the approved plan; the gap list exists from Step A1
-- **Auto-commit on green** — do NOT wait for user approval at Step 8. If all checks pass (type check, unit tests, E2E, spec compliance), commit immediately with a descriptive message
+- **Auto-commit on green** — do NOT wait for user approval at Step 8. If all checks pass (type check, unit tests, spec compliance), commit immediately with a descriptive message
 - **Auto-fix failures** — if tests fail, fix and re-run (up to 3 attempts per failure). If still failing after 3 attempts, log the failure and continue to the next batch (don't block the pipeline)
-- **E2E tests are mandatory** — for every batch with user-facing changes, the E2E Test Agent must run. New features get new E2E tests. Changed features get updated E2E tests.
-- **Rebuild frontend before E2E** — if frontend files changed, run the build command before E2E tests (E2E tests run against built assets, not dev server HMR)
+- **Build mode: greenfield** — E2E tests are DEFERRED to pre-deploy (Step B2). Per-batch checks are: type check + unit tests + spec compliance only. Do NOT spawn E2E Test Agent.
+- **Build mode: incremental** — E2E tests are MANDATORY per-batch for every batch with user-facing changes. The E2E Test Agent must run. New features get new E2E tests. Changed features get updated E2E tests. Rebuild frontend before E2E (E2E tests run against built assets, not dev server HMR).
 
 Commit message format:
 ```
@@ -176,10 +198,30 @@ After committing:
 
 #### Step B2: Pre-Deploy (after all batches complete)
 
-Run the full `/pre-deploy` check:
+Run the full `/pre-deploy` check. Pass the build mode so it knows its E2E responsibility.
+
+**For greenfield builds, pre-deploy is the SOLE owner of E2E testing.** This is where:
+1. Dev servers are started for the first time as a complete stack
+2. Seed data scripts are created (the API now exists)
+3. E2E test suite is written (golden path journeys, role-based access, navigation)
+4. All E2E tests are run against real servers
+5. Any E2E failures are fixed before the build is declared READY
+
+Pre-deploy checks:
 - Unit tests (full suite)
 - Type check
-- E2E tests (full suite — rebuild frontend first)
+- **E2E tests (MANDATORY — this is the primary E2E gate for greenfield builds)**:
+  - Start both dev servers and verify connectivity
+  - Create seed data script if it doesn't exist
+  - Write E2E tests that meet the `/e2e` skill's **Minimum Coverage Requirements**:
+    - Golden path CRUD journey (create → view → edit → verify → delete)
+    - Auth journeys (login flow, access control, logout)
+    - Navigation journeys (reach pages via clicks, verify content at each step)
+    - Form submission tests (fill forms, submit, verify data persists)
+  - Rebuild frontend, then run full E2E suite
+  - **E2E Quality Gate**: classify each test as journey vs smoke. FAIL if fewer than 5 journey tests, or if journey tests < smoke tests. See `/e2e` skill for classification method.
+  - A single E2E failure = NOT READY
+  - A smoke-only E2E suite = NOT READY (even if all tests pass)
 - Security scan
 - Dependency check
 - Spec compliance (against the master gap list)

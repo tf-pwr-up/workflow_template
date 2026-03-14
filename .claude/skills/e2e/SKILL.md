@@ -121,6 +121,59 @@ test('shows loading state and handles API errors gracefully', async ({ page }) =
 });
 ```
 
+## Minimum Coverage Requirements (BLOCKING — enforced at pre-deploy and per-batch)
+
+E2E coverage is measured against the application's actual features, not a fixed checklist. The agent must discover what the application does and verify that every key user journey is tested.
+
+### Coverage Principle
+
+**If a feature exists and a user can interact with it, there must be an E2E test that exercises it.** The test must do what the user does — navigate to the feature, interact with it, and verify the result. A feature with no E2E test is an untested feature, and untested features ship bugs.
+
+### Discovery-Driven Coverage
+
+Before evaluating coverage, the agent must build a feature map by reading the application's routes, pages, forms, and API endpoints. Then verify:
+
+1. **Every primary entity type has a full lifecycle test**: create → view detail page → edit → verify edit persisted → delete/deactivate → verify removal. If the app manages Products, Orders, and Users, there must be lifecycle tests for Products, Orders, and Users — not just one of them.
+
+2. **Every form that submits data has a submission test**: The test must fill the form, submit it, and verify the submitted data appears correctly afterward (on the next page, in a list, or on a detail view). This applies to create forms, edit forms, settings forms, wizard steps, and any other form that writes data.
+
+3. **Every multi-step workflow has an end-to-end test**: Approval flows, wizards, state transitions, import/export processes — any workflow that spans multiple steps or pages must be tested from start to finish.
+
+4. **Every page that fetches data from the API is visited with real data**: Pages that load and display data are high-risk for integration bugs (response shape mismatches, infinite loops, error handling failures). These pages MUST be visited in E2E tests with real data present, and the test must verify the data renders correctly — not just that the page loads.
+
+5. **Every role's primary workflows are tested**: If the app has different user roles (admin, member, public), the key workflows for each role must be covered.
+
+6. **Error states are tested**: At least one test must trigger a form validation error and verify the error message. At least one test must verify unauthorized access is blocked.
+
+### What Counts as a Journey Test
+
+A test qualifies as a **journey test** if it does ALL of these:
+1. **Interacts with UI elements** — clicks buttons, fills forms, navigates links
+2. **Submits data or triggers state changes** — not just reading/viewing
+3. **Verifies the outcome** — checks that data was created/updated/deleted, not just that a page loaded
+4. **Spans multiple pages or states** — tests a workflow, not a single page render
+
+### What Does NOT Count
+
+These are smoke tests, not journey tests. They provide near-zero confidence:
+- `page.goto(url)` + `expect(element).toBeVisible()` — proves the page renders, nothing more
+- Checking that a heading contains text — proves the component exists, not that it works
+- Checking that a table exists without verifying its data content
+- Checking element counts without verifying element content
+
+### Quality Gate
+
+**BLOCKING conditions** (any one = INSUFFICIENT):
+- Journey test count < smoke test count (the suite is mostly smoke)
+- Any primary entity type has no lifecycle test (create/view/edit/delete)
+- Any create or edit form has no submission test
+- Any multi-step workflow has no end-to-end test
+- Any data-fetching page is never visited with real data in any test
+- No test covers form validation errors
+- No test covers unauthorized access
+
+The agent must log: "E2E Coverage: X/Y features covered. X journey tests, Y smoke tests. Uncovered features: [list]."
+
 ## Golden Path Test Suite
 
 Every project MUST have a dedicated golden path test file (e.g. `golden-path.spec.ts`) that exercises the core user workflow end-to-end in a single continuous flow.
@@ -308,8 +361,8 @@ E2E tests need known data to test against. Before running tests:
 1. Check if the project has a seed data script or fixture (see CLAUDE.md)
 2. If seed data exists, run it to ensure the database/storage has known state
 3. If no seed data exists, create a seed script that:
-   - Creates at least one user account (with known credentials or token)
-   - Creates minimal reference data the app needs to load (config, entity types, etc.)
+   - Creates at least one user account (with known credentials for login)
+   - Creates minimal reference data the app needs to function
    - Is idempotent (safe to run multiple times)
 4. E2E tests should restore seed data in `beforeAll` or global setup
 
@@ -318,23 +371,43 @@ E2E tests need known data to test against. Before running tests:
 Read CLAUDE.md for the project's E2E test framework and conventions. Common infrastructure patterns:
 - **Global setup** — seeds data and authenticates via the real API before all tests
 - **Seed data** — a script or fixture that populates the real database/storage with known state
-- **Auth helper** — authenticates via the real API (POST /auth/login, etc.) and stores the session token for use in browser context
+- **Auth helper** — completes the full login flow through the UI, including any out-of-band steps via dev-mode mechanisms (see "Auth in E2E Tests" below)
 - **Serial execution** — tests run sequentially if they share database state
 - **Ordered files** — test files run in a defined order (e.g. numeric prefixes)
 
-### Auth in E2E Tests
+### Auth in E2E Tests (NON-NEGOTIABLE — simulate real user experience)
 
-Authentication MUST go through the real auth flow or a legitimate shortcut:
+Authentication MUST go through the **exact same flow a real user follows**. The goal is to test the auth system end-to-end, not bypass it. If the auth flow is broken, E2E tests MUST fail — that's the point.
 
-**Acceptable approaches:**
-- Call the real login API endpoint to get a real session token, then inject that token into the browser's localStorage/cookies
-- Use a test-only API endpoint that issues a real session token for a known test user
-- Use the real magic-link/OAuth flow if it can be automated (e.g. intercepting the email in dev mode)
+**Principle: No shortcuts. Test what the user experiences.**
 
-**NOT acceptable:**
-- Injecting fake JWT tokens that were never issued by the API
-- Mocking the auth middleware
-- Bypassing auth entirely
+E2E auth tests must:
+
+1. **Start at the login page** — navigate to it just like a user would.
+2. **Submit real credentials through the UI** — fill in the form, click submit.
+3. **Complete the full auth handshake** — whatever the project's auth mechanism is (magic links, OAuth, email/password), the test must go through it end-to-end. If the auth mechanism involves an out-of-band step (e.g., clicking a link in an email, entering an OTP), the dev environment MUST provide a way for tests to observe that step (e.g., server logs, a test mailbox, a predictable OTP) — and the test must USE that mechanism rather than bypassing it.
+4. **Verify the authenticated state** — after auth completes, verify the user is actually logged in (user info visible, protected pages accessible).
+
+**The auth helper must exercise the real auth infrastructure.** Read the project's auth flow, understand how it works in dev mode, and write a helper that completes it programmatically the same way a user would — just substituting the out-of-band channel (email, SMS) with whatever dev-mode equivalent the project provides (logs, test mailbox, etc.).
+
+**Why this matters:**
+- Auth is the most common source of integration bugs: proxy misconfigurations, response shape mismatches, token handling errors, callback routing issues.
+- If tests bypass auth, these bugs ship to production undetected.
+- An E2E test that can't log in is surfacing a real bug — not a testing problem to work around.
+
+**NOT acceptable — these bypass auth and hide bugs:**
+- Injecting tokens directly into localStorage/cookies without going through the login flow
+- Creating test-only API endpoints that issue tokens
+- Mocking the auth middleware or intercepting auth requests
+- Pre-creating `storageState` files with tokens obtained outside the test
+- Any approach where the test would still pass if the login page or auth callback were completely broken
+
+**Building the auth helper:**
+1. Read the project's auth implementation to understand the flow
+2. Identify the dev-mode mechanism for completing out-of-band steps (check server logs, test email service, etc.)
+3. Write a helper that automates the full flow: login UI → credential submission → out-of-band step completion → auth callback → verified session
+4. If no dev-mode mechanism exists for the out-of-band step, CREATE one (e.g., log auth tokens/links to a file in dev mode) — this is infrastructure, not a bypass
+5. Document the auth helper and its prerequisites in the E2E test README or CLAUDE.md
 
 ## Instructions
 
