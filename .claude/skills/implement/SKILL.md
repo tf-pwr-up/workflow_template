@@ -69,10 +69,18 @@ Every implementation unit MUST have BOTH a Code Agent AND a Test Agent launched 
 - Tests MUST verify behaviour, not just existence
 - NEVER write tests that just check `typeof X === 'function'` or `expect(Component).toBeDefined()` — these prove nothing
 - Unit tests for components must: render the component with realistic props, interact with it (fill forms, click buttons), and verify the output changes correctly
-- Unit tests for API calls must: make real requests (or use app.request() for Hono), verify response status codes AND response body shapes
+- Unit tests for API calls must: make real requests (or use the framework's test request helper), verify response status codes AND response body shapes
 - If your test would pass even when the feature is completely broken, your test is worthless — rewrite it
 
-**E2E Test Agent** (runs once, after all units — MANDATORY for batches with user-facing changes):
+**E2E Test Agent** (runs once, after all units — conditional on build mode):
+
+**Build mode determines when E2E tests run:**
+
+- **Greenfield builds** (invoked by `/build` with greenfield mode): **SKIP the E2E Test Agent entirely.** E2E tests are deferred to `/pre-deploy`, which owns the full E2E lifecycle: starting servers, creating seed data, writing tests, and running them. Per-batch E2E is structurally impossible in greenfield because frontend and backend are built in different batches.
+- **Incremental builds** (invoked by `/build` with incremental mode, or invoked standalone): **E2E Test Agent is MANDATORY** for batches with user-facing changes.
+- **Standalone invocation** (not from `/build`): If the full stack already works (servers start, API responds), run E2E. If not, warn the user and skip with a clear message: "E2E skipped — dev servers not available. Run `/e2e` or `/pre-deploy` when servers are ready."
+
+**When E2E DOES run (incremental builds or standalone with working servers):**
 
 **CRITICAL — E2E means REAL servers, NO mocking:**
 E2E tests MUST hit real running frontend and API servers. They MUST NOT use `page.route()`, MSW, nock, or any other mechanism to mock API responses. If you mock the API, you are writing frontend integration tests, not E2E tests. The `/e2e` skill defines this requirement in detail — read it.
@@ -81,7 +89,7 @@ E2E tests MUST hit real running frontend and API servers. They MUST NOT use `pag
 1. **Playwright installed**: If not, install `@playwright/test`, browsers, create config and test directory.
 2. **Full-stack connectivity**: Frontend and API dev servers must BOTH be running, and the frontend must be able to reach the API (via proxy, CORS, or shared origin). If the project has separate frontend/API servers and no dev proxy is configured, **configure one** (e.g. Vite `server.proxy` in `vite.config.ts`) before writing any tests.
 3. **Seed data**: A mechanism to populate known test data via the real API must exist. If it doesn't, create a seed script or global setup that calls real API endpoints to create test fixtures.
-4. **Auth via real API**: Tests must authenticate by calling the real auth endpoint (not by injecting fake tokens). Create or use a test-only auth helper that obtains real session tokens from the API.
+4. **Auth via real user flow**: Tests must authenticate by going through the real login flow as a user would (not by injecting tokens or using test-only endpoints). See the `/e2e` skill's "Auth in E2E Tests" section for requirements. If the auth flow has an out-of-band step, the dev environment must provide a way for tests to complete it.
 
 **E2E test responsibilities:**
 - Review what features changed and determine which E2E tests need updating
@@ -89,7 +97,7 @@ E2E tests MUST hit real running frontend and API servers. They MUST NOT use `pag
 - For changed behaviour: update existing E2E test assertions to match
 - For changed UI: update test selectors (text content, element selectors)
 - For schema changes: update seed data script to include new types/fields
-- Follow the `/e2e` skill for conventions — especially the no-mocking rule
+- Follow the `/e2e` skill for conventions — especially the no-mocking rule and **Minimum Coverage Requirements**
 - E2E tests must be USER JOURNEY tests that complete full workflows through the UI
 - Navigate via clicks and links, not direct page.goto() to interior pages
 - Fill real forms with real data, submit them, verify the data appears correctly
@@ -97,7 +105,19 @@ E2E tests MUST hit real running frontend and API servers. They MUST NOT use `pag
 - A test that just goes to a URL and checks the page container is visible is a smoke test, not an E2E test
 - **Golden Path requirement**: For each batch with user-facing features, at least one E2E test must complete the full create → view → edit → verify cycle
 
-**Skip conditions (narrow):** Only skip if the batch contains ZERO user-facing changes (e.g., purely backend refactoring with no API shape changes, or tooling-only changes). If in doubt, run E2E tests.
+**Per-batch E2E minimum (incremental builds):**
+Each batch with user-facing changes must add at least:
+- 1 journey test per new create/edit form (fill form → submit → verify data persists)
+- 1 journey test per new page/feature (navigate to it via clicks → interact → verify outcome)
+- Updated journey tests for changed features (not just updated selectors — verify the new behaviour)
+
+**Per-batch E2E quality check:**
+After E2E tests run, classify each test as journey or smoke using the `/e2e` skill's verification method. Log: "Batch E2E: X journey tests, Y smoke tests." If the batch added 0 journey tests for user-facing features, this is a FAIL — write them before proceeding.
+
+**Skip conditions:**
+- Greenfield build mode (E2E deferred to pre-deploy)
+- Batch contains ZERO user-facing changes (purely backend refactoring with no API shape changes, or tooling-only changes)
+- Standalone invocation where dev servers are not available (warn user)
 
 ### Step 3: Dependent Units
 After independent units complete, implement dependent units in dependency order, again with parallel code+test agents.
@@ -145,8 +165,10 @@ After all units complete, run the Integration Agent:
 2. Type check the entire project (see CLAUDE.md for command)
 3. Lint check (see CLAUDE.md for command)
 4. Run all unit/integration tests (see CLAUDE.md for command)
-5. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
-   E2E tests must include at least one user journey test per feature (not just page-load checks). If all E2E tests are of the form "goto URL, check element visible", they are insufficient — add journey tests.
+5. Run E2E tests — **conditional on build mode**:
+   - **Greenfield**: SKIP. E2E is deferred to `/pre-deploy`. Log: "E2E deferred to pre-deploy (greenfield mode)."
+   - **Incremental**: MANDATORY for batches with user-facing changes. If Playwright is not installed, bootstrap it first. Do NOT skip — "framework not installed" is not a valid reason. See /e2e skill; requires dev servers running. E2E tests must include at least one user journey test per feature (not just page-load checks).
+   - **Standalone (no build mode set)**: Run E2E if dev servers are available. If not, warn and skip with message.
 6. **Test file count verification (BLOCKING)**:
    - Count the number of production files created/modified in this implementation
    - Count the number of test files created/modified
@@ -206,7 +228,7 @@ Use the Edit tool to append to existing sections. Check what's already there to 
 ### Step 8: Commit & Report
 
 **If invoked by `/build` (autonomous mode):**
-- Auto-commit immediately if all checks pass (type check, tests, E2E, spec compliance)
+- Auto-commit immediately if all checks pass (type check, unit tests, spec compliance — and E2E if incremental mode)
 - Use descriptive commit message summarizing what was implemented
 - Log results for the final `/build` report
 - Do NOT wait for user approval — proceed to next batch
