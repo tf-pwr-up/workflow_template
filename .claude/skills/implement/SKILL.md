@@ -1,5 +1,6 @@
 ---
 name: implement
+user-invocable: true
 description: "Parallel Code + Test Implementation with integration checks."
 ---
 
@@ -12,6 +13,15 @@ Trigger: User approves a plan and wants implementation to begin.
 **I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.**
 
 Every Code Agent, Test Agent, E2E Test Agent, and Integration Agent spawned by this skill operates under this standard. There is no "good enough for now." Every file you write will be used by real people. Write it as if you are personally responsible for every bug, every invisible button, every test that proves nothing.
+
+## Anti-Shortcut Rules (learned from real failures)
+
+These rules exist because these exact shortcuts were taken and caused bugs that reached the user:
+
+1. **"TypeScript passes" ≠ "the app works."** `tsc --noEmit` is static analysis. It cannot catch bundler errors (Vite/webpack import resolution), runtime module failures, CSS plugin crashes, or dev proxy misconfiguration. You MUST start dev servers and load the app.
+2. **Writing E2E test files without running them is not testing.** If you write `e2e/*.spec.ts` files but never execute `npx playwright test`, you have not tested anything. Log the test runner output.
+3. **"I'll run E2E in the next batch" is skipping E2E.** Every batch with user-facing changes must have E2E tests executed in that batch. Deferral is a violation.
+4. **Optional dependencies must be tested at runtime.** If code uses `import('xlsx')` or similar dynamic imports for optional packages, you must verify the import works (or fails gracefully) by actually loading the page that uses it in a real browser/dev server. Static analysis cannot catch these.
 
 ## Prerequisites (BLOCKING — do not skip, do not work around)
 
@@ -145,24 +155,34 @@ After all units complete, run the Integration Agent:
 2. Type check the entire project (see CLAUDE.md for command)
 3. Lint check (see CLAUDE.md for command)
 4. Run all unit/integration tests (see CLAUDE.md for command)
-5. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
+5. **Runtime Verification (BLOCKING — do not skip, do not treat type-checking as a substitute)**:
+   TypeScript type-checking is STATIC ONLY. It does NOT catch bundler errors (Vite import resolution, dynamic import failures, missing modules at runtime, CSS processing errors, asset pipeline issues). You MUST verify the app actually runs:
+   a. Start the frontend dev server (e.g. `npm run dev`) and verify it starts without errors in stdout/stderr. Check for Vite/webpack build errors, module resolution failures, and plugin errors. If it fails, FIX THE ERROR before proceeding — this is a real bug that users will hit.
+   b. Start the API/backend dev server (e.g. `npx wrangler dev`) and verify it starts without errors.
+   c. Load the app's root URL in a headless browser (or curl it) and verify you get HTML, not an error page or blank response.
+   d. If the project has a dev proxy (e.g. Vite proxying /api to the backend), verify an API call succeeds through the proxy.
+   e. Check the browser console / dev server output for runtime errors (failed imports, 404s for assets, etc.).
+   **Evidence required**: Log the actual commands run, their exit codes, and any errors. "I verified it works" without showing commands is NOT acceptable.
+   **Common runtime-only failures this catches**: dynamic import resolution (e.g. `import('xlsx')` failing in Vite even with `@vite-ignore`), missing peer dependencies, CSS plugin errors, asset pipeline misconfiguration, proxy routing failures.
+6. Run E2E tests (MANDATORY for batches with user-facing changes). If Playwright is not installed, bootstrap it first (see E2E Test Agent prerequisites). Do NOT skip this step — "framework not installed" is not a valid reason to skip. See /e2e skill; requires dev servers running.
    E2E tests must include at least one user journey test per feature (not just page-load checks). If all E2E tests are of the form "goto URL, check element visible", they are insufficient — add journey tests.
-6. **Test file count verification (BLOCKING)**:
+   **E2E tests MUST be EXECUTED, not just written.** Log the actual `npx playwright test` command output with pass/fail counts. Writing test files without running them is a workflow violation. If tests cannot run (servers won't start, infrastructure missing), that is a BLOCKING failure to fix — not a reason to skip.
+7. **Test file count verification (BLOCKING)**:
    - Count the number of production files created/modified in this implementation
    - Count the number of test files created/modified
    - If any implementation unit has production code but NO corresponding test file, STOP and write the missing tests before proceeding
    - Log the counts explicitly: "Production files: N, Test files: M"
-7. Check for cross-file issues:
+8. Check for cross-file issues:
    - Missing imports
    - Type mismatches at boundaries
    - Unused exports
-8. Verify API contract alignment (MANDATORY — catches a known bug pattern):
+9. Verify API contract alignment (MANDATORY — catches a known bug pattern):
    - For every frontend API call, read the backend route handler
    - Verify the expected response type matches what the API client returns after any transforms
    - For create/edit forms, verify every required API field has a UI input (including system fields)
    - For page components, verify each is registered in the router
    - For every link in new/changed code, verify it matches a route pattern in the router
-9. **Verify UI element visibility (BLOCKING)**:
+10. **Verify UI element visibility (BLOCKING)**:
    - For every new button, link, or nav item, check that the CSS/utility classes provide sufficient contrast against the background
    - Flag any interactive element using text-gray-400/text-gray-500 on light backgrounds as BLOCKING
    - Flag any interactive element using text-gray-600 or darker text on dark backgrounds as BLOCKING
