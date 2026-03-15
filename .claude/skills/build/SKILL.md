@@ -1,5 +1,6 @@
 ---
 name: build
+user-invocable: true
 description: "Autonomous end-to-end pipeline: spec, plan, implement all batches, test, pre-deploy."
 ---
 
@@ -162,16 +163,23 @@ Add Batch N: <brief description of what was implemented>
 - Tests: X unit tests, Y E2E tests added/updated
 ```
 
-##### B1.3: Post-Batch Verification
+##### B1.3: Post-Batch Verification (BLOCKING — every check must pass before next batch)
 
 After committing:
-- Run `npx turbo test` to verify all unit tests still pass (regression check)
-- Run `npx turbo build` to verify types still clean
-- **Full-stack smoke test** (at least once per build, and after any batch that changes frontend-API connectivity):
-  1. Start both frontend and API dev servers
-  2. Verify the frontend can reach the API (curl the API health endpoint through the frontend's proxy)
-  3. Load the app in a headless browser and verify it renders (not a blank page, not an error)
-  4. If this fails, the proxy or dev setup is broken — fix before proceeding
+- Run unit tests (see CLAUDE.md for command) to verify all tests still pass (regression check)
+- Run type check (see CLAUDE.md for command) to verify types still clean
+- **Runtime Verification (MANDATORY for EVERY batch — do not skip, do not defer)**:
+  TypeScript type-checking is STATIC ONLY and does NOT catch bundler errors, module resolution failures, or runtime issues. You MUST verify the app actually starts and loads:
+  1. Start the API/backend dev server and verify it starts without errors in stdout/stderr. Log the command and output.
+  2. Start the frontend dev server and verify it starts without errors. **Watch for bundler errors** (Vite/webpack import resolution failures, plugin errors, CSS processing errors, missing modules). These are REAL BUGS that users will hit. Log the command and output.
+  3. Load the app's root URL (curl or headless browser) and verify you get HTML content, not an error page.
+  4. If the project has a dev proxy, verify an API call succeeds through it.
+  5. Check for runtime errors in dev server output (failed dynamic imports, 404s, module not found).
+  **If any of these fail, the batch is NOT DONE.** Fix the error, re-commit, and re-verify. Do not proceed to the next batch.
+  **Evidence required**: Log the actual commands run and their output. "I verified it works" without showing evidence is NOT acceptable.
+  **Known failure patterns this catches**: dynamic `import()` that Vite resolves statically despite `@vite-ignore`, optional dependencies not handled correctly at runtime, dev proxy misconfiguration, CSS plugin version incompatibilities.
+- **E2E test execution (MANDATORY for batches with user-facing changes)**:
+  Run `npx playwright test` and log the output. E2E tests must be EXECUTED, not just written. Writing test files without running them is a workflow violation. If E2E tests cannot run because servers won't start, that is a runtime verification failure — fix it first.
 - If regression detected, fix immediately before proceeding to next batch
 
 #### Step B2: Pre-Deploy (after all batches complete)
@@ -253,6 +261,14 @@ At each phase boundary, the `/build` pipeline MUST verify that the required skil
 - **Verify**: `/implement` will spawn parallel Code Agent + Test Agent pairs (not write code inline)
 - **If violated**: STOP the pipeline. The agent is bypassing the multi-agent workflow.
 
+### Checkpoint 4: After each batch in Phase B (Runtime Verification)
+- **Verify**: Dev servers (frontend AND backend) were actually started with real commands
+- **Verify**: The frontend dev server started without bundler errors (no Vite/webpack module resolution failures, no plugin errors)
+- **Verify**: The app was loaded in a browser or via curl and returned real HTML content
+- **Verify**: E2E tests were EXECUTED (not just written) with logged pass/fail output
+- **If violated**: The batch is NOT COMPLETE. Roll back the commit if needed, fix the runtime error, and re-verify.
+- **TypeScript type-checking alone is NEVER sufficient.** Type-checking is static analysis only. It cannot catch: bundler import resolution errors, dynamic import failures at runtime, CSS plugin errors, dev proxy misconfiguration, missing optional dependencies, or any error that only manifests when the app actually runs. A batch that passes `tsc --noEmit` but crashes when loaded in a browser is a FAILED batch.
+
 ### What counts as "invoked properly"
 - The Skill tool was called with the skill name (e.g., `skill: "phase-0"`)
 - The skill's internal agents (Inventory Agent, Gap Agent, Plan Agent, Review Agents, Code Agents, Test Agents) were launched via the Agent tool
@@ -263,6 +279,9 @@ At each phase boundary, the `/build` pipeline MUST verify that the required skil
 - Summarising what the agents "would have found" without spawning them
 - Writing production code directly using Write/Edit tools instead of through Code Agents
 - Producing a plan without running Review Agents against it
+- Claiming tests pass without showing the actual test runner output
+- Claiming the app works without starting dev servers and loading it
+- Treating `tsc --noEmit` passing as proof the app runs correctly
 
 ---
 
