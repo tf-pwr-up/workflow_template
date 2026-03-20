@@ -1,300 +1,456 @@
 ---
 name: analyze
-description: "Deep Analysis & Documentation of a source codebase or spec."
+description: "High-level business analysis — establishes requirements through structured questioning and council review"
 ---
 
-## Craftsmanship Standard
-
-> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.
-
-Analysis is the foundation everything else builds on. A thorough analysis means every downstream agent has the context to deliver excellent work. A lazy analysis means bugs, gaps, and rework.
-
-# /analyze — Deep Analysis & Documentation
-
-Trigger: User wants to analyze a source (codebase, requirements, specs) to build implementation documentation.
+# /analyze — High-Level Business Analysis
 
 ## Purpose
 
-Produce a persistent documentation corpus in `docs/analysis/` that captures every feature area with enough detail to implement accurately — visual design, interactions, data flow, edge cases, and user-confirmed requirements.
+Establish what needs to be built through structured business analysis questioning. This skill can run for the whole project (initial analysis) or for a new major feature (incremental analysis). The output is a set of requirements broken into proposed sprints, reviewed and approved by the council of experts.
 
-This is the **first step** in the workflow. Everything else reads from this output.
+## Prerequisites (BLOCKING)
 
-## Usage
+Before executing ANY step in this skill, verify:
 
+1. **`council-config.json` must exist** in the project root.
+   - If missing: STOP. Tell the user: "Council configuration not found. Run `/setup` first to configure the project."
+   - Do NOT proceed. Do NOT offer to create it manually.
+
+2. **`docs/requirements/` directory must exist.**
+   - If missing but `council-config.json` exists: create the directory structure (setup may have been partially completed).
+
+3. **Read `council-config.json`** and load the project context (name, type, domain, language, architecture pattern). This context informs all BA questioning.
+
+---
+
+## Execution Steps
+
+### Step 1 — Scope Determination
+
+**Q1: Analysis Scope**
 ```
-/analyze [source-path] [--area <feature-area>] [--ask]
-```
-
-- `source-path` — the source to analyze (codebase directory, spec folder, or document path)
-- `--area <name>` — analyze only one area (e.g. "entity-editor", "auth", "dashboard")
-- `--ask` — enable interactive Q&A mode (pause to ask user clarifying questions)
-
-If no arguments provided and a reference implementation is defined in CLAUDE.md, analyze that.
-
-## Instructions
-
-### Step 0: Identify Source Type
-
-Read the source path and classify it:
-
-- **Codebase** — contains source files (`.ts`, `.tsx`, `.py`, `.go`, etc.), `package.json`, `Cargo.toml`, etc.
-- **Spec/Requirements** — contains documents (`.md`, `.docx`, `.pdf`, `.txt`), wireframes, or design files
-- **Mixed** — contains both code and documentation
-
-This classification determines how each phase operates (see per-phase instructions below).
-
----
-
-### Phase 1: Discovery (Structural Map)
-
-Launch a Discovery Agent to produce a structural map of the source material.
-
-**If source is a codebase:**
-1. File tree — list all source files by directory, noting purpose of each
-2. Route map — every URL route and what renders/handles each
-3. API surface — every endpoint, method, request/response shapes
-4. Data model — all types, interfaces, database schemas
-5. Component tree — all UI components and their parent-child relationships
-6. Store/state map — all state management (stores, hooks, context, signals)
-7. External dependencies — third-party packages and what they're used for
-
-**If source is specs/requirements:**
-1. Document inventory — list all documents, noting scope and purpose of each
-2. Feature map — every feature, capability, or user story described
-3. Data entities — any data models, schemas, or domain objects mentioned
-4. User roles — every actor, persona, or role described
-5. Integrations — any external systems, APIs, or services referenced
-6. Constraints — performance, security, compliance, or platform constraints stated
-7. Terminology — domain-specific terms and definitions
-
-**If mixed:** Combine both approaches — use code as ground truth, specs as intent.
-
-Output: Write `docs/analysis/00-structure.md` with the complete structural map.
-
-**Update CLAUDE.md**: After writing the structural map, update the Project Configuration section of `CLAUDE.md`:
-- **Stack** — runtime, frameworks, database, frontend, testing, build tools discovered
-- **Directory Structure** — key directories and their purposes
-- **Commands** — dev server, test, lint, type check commands found in package.json/Makefile/etc.
-- **Reference Implementation** — if analyzing a reference, record its path
-
-Use the Edit tool to replace the HTML comment placeholders with actual content. Preserve the section headers.
-
----
-
-### Phase 2: Feature Decomposition
-
-From the structural map, identify distinct feature areas. Launch parallel Analysis Agents (up to 5 at a time) for each area. Each agent must:
-
-**If source is a codebase:**
-1. Read every file relevant to this feature area
-2. Document user-visible behaviour — step-by-step flows of what the user sees and does
-3. Document visual design — exact CSS classes, color tokens, spacing, responsive breakpoints, animations, hover states, dark mode. Include literal class strings.
-4. Document data flow — API calls, state management, component props, transforms
-5. Document interactions — click handlers, keyboard shortcuts, form validation, loading states, error states, empty states
-6. Document edge cases — missing data, network failures, 0 items vs 1000, permission boundaries, concurrent edits
-7. List every prop/parameter for key components and functions
-
-**If source is specs/requirements:**
-1. Read every document relevant to this feature area
-2. Document user-visible behaviour — step-by-step flows described or implied
-3. Document visual design — any mockups, wireframes, or design specs referenced
-4. Document data flow — data entities, transformations, and rules described
-5. Document interactions — user actions, system responses, validation rules
-6. Document edge cases — explicitly stated AND infer obvious ones the spec omits
-7. List every acceptance criteria, business rule, or constraint
-
-**Regardless of source type**, flag anything that is:
-- **Ambiguous** — could be interpreted multiple ways
-- **Incomplete** — behaviour not fully described
-- **Contradictory** — conflicts with another part of the source material
-
-Output: Write `docs/analysis/NN-<area-name>.md` for each area.
-
----
-
-### Phase 3: Cross-Cutting Concerns
-
-Launch agents for concerns that span feature areas:
-
-1. **Design System Agent** — extract the complete design vocabulary:
-   - If from code: every CSS utility/shortcut, color palette (hex, HSL, CSS vars), typography scale, spacing system, shadow/elevation scale, border radius, animation library, icon system, dark mode strategy, responsive breakpoints, component styling patterns
-   - If from specs: any brand guidelines, color requirements, typography preferences, responsive requirements, accessibility standards, design tokens
-
-2. **Pattern Agent** — extract recurring implementation patterns:
-   - If from code: form patterns, loading/error/empty states, pagination, modals/dialogs, auth checks, data fetching/caching, component composition, real-time data handling
-   - If from specs: common workflows, shared UI patterns, cross-feature behaviours, standard response patterns, error handling requirements
-
-Output: Write `docs/analysis/90-design-system.md` and `docs/analysis/91-patterns.md`.
-
-**Update CLAUDE.md**: After writing cross-cutting docs, update the Project Configuration section:
-- **Design System** — CSS framework, config file, fonts, color tokens, shortcuts, icons, dark mode, responsive strategy
-- **Established Patterns** — recurring code patterns discovered (route factory, service layer, DI, auth, error handling, test infrastructure, etc.)
-- **Data Model Conventions** — data format, response conventions, state management approach
-- **Coding Conventions** — language mode, import style, file organization preferences
-
-Use the Edit tool to replace or append to existing content. Do not overwrite previously populated sections — merge new information.
-
----
-
-### Phase 4: User Q&A (if --ask flag or gaps detected)
-
-After analysis, present questions to the user grouped by category:
-
-**Requirements questions** (things the source can't tell us):
-- "The source describes feature X — do you want this? Priority?"
-- "There are two approaches for Y — which do you prefer?"
-- "Feature Z requires [external service] — do you have access / want alternative?"
-
-**Architecture questions:**
-- "The source uses/implies [framework/library] — keep it or consider alternatives?"
-- "What database/storage approach do you want?"
-- "What are your deployment constraints?"
-
-**Scope questions:**
-- "Which feature areas are must-have vs nice-to-have vs out-of-scope?"
-- "Some features require major effort (e.g. offline-first). Include or defer?"
-
-**Design questions:**
-- "The source uses/specifies [visual pattern] — keep it or change?"
-- "Mobile support — what level of priority?"
-
-Record all answers in `docs/analysis/99-decisions.md`.
-
----
-
-### Phase 5: Business Analysis Review (ITERATIVE)
-
-This phase is **critical** and runs iteratively until the corpus reaches sufficient quality.
-
-Launch a **BA Review Agent** that acts as a senior product/business analyst. This agent:
-
-1. **Reads the entire `docs/analysis/` corpus** produced so far
-2. **Evaluates completeness** against a checklist:
-   - Are all user roles and their permissions clearly defined?
-   - Is every user journey documented end-to-end (not just the happy path)?
-   - Are all state transitions explicit (e.g. draft → pending → published)?
-   - Are validation rules concrete (not vague "must be valid")?
-   - Are error scenarios documented with expected system behaviour?
-   - Are data relationships and cardinality specified?
-   - Are non-functional requirements stated (performance, scale, accessibility)?
-   - Are integration points fully described (auth flows, API contracts, webhooks)?
-   - Are there any features referenced but never fully described?
-   - Are edge cases covered for every feature (empty, overflow, concurrent, offline)?
-3. **Cross-references** feature docs against each other — does feature A's description of a shared entity match feature B's description?
-4. **Identifies gaps** and produces a structured report:
-
-```
-## BA Review — Round N
-
-### GAPS (must resolve before proceeding)
-- [AREA: entity-editor] No description of what happens when a required field is left empty
-- [AREA: auth] Token expiry time not specified
-
-### AMBIGUITIES (need clarification)
-- [AREA: workflow] "Approval" mentioned but approver role not defined
-- [AREA: types] Can field order be changed after entities exist?
-
-### CONTRADICTIONS
-- [AREA: permissions] 00-structure says 3 roles, 04-permissions says 4
-
-### SUGGESTIONS (would improve the spec)
-- [AREA: search] Consider documenting search ranking/relevance logic
+AskUserQuestion(
+  question: "Is this analysis for the whole project or for a new feature/module?",
+  options: ["Whole project — initial requirements gathering", "New feature — adding to existing requirements"]
+)
 ```
 
-5. **Resolution loop:**
-   - If gaps can be resolved from the source material: re-read the source, update the relevant analysis doc, and note what was added
-   - If gaps require user input: present questions to the user (same format as Phase 4), record answers in `99-decisions.md`, and update relevant analysis docs
-   - If gaps are inferred from domain knowledge: document the assumption explicitly and mark it `[ASSUMED]` so the user can confirm or override
+**If "New feature":**
+- Check `docs/requirements/00-index.md` for existing requirement areas.
+- If areas exist, present them:
+  ```
+  AskUserQuestion(
+    question: "Which area does this feature relate to? Select an existing area or choose 'New area'.",
+    options: [<existing areas from index>, "New area"]
+  )
+  ```
+- If "New area" or no index exists:
+  ```
+  AskUserQuestion(
+    question: "Briefly describe the area or name for this feature set (e.g., 'user-authentication', 'payment-processing', 'notification-system')."
+  )
+  ```
 
-6. **Repeat** phases 5.1–5.5 until:
-   - No GAPS or CONTRADICTIONS remain
-   - All AMBIGUITIES are either resolved or explicitly marked as deferred
-   - The BA Review Agent signs off: `"Corpus is implementation-ready"`
-   - Maximum 3 review rounds (to avoid infinite loops — escalate remaining items to user)
+Record the scope and area for use in subsequent steps.
 
-Output: Append review log to `docs/analysis/96-ba-review.md` (one section per round).
+### Step 2 — BA Questioning
 
----
+Spawn a Business Analysis agent using the system prompt below. The BA agent conducts structured questioning via `AskUserQuestion`, one question at a time, adapting based on previous answers.
 
-### Phase 6: Implementation Checklists
+#### BA Agent System Prompt
 
-From the analysis docs (now BA-reviewed), generate atomic implementation checklists:
+```
+You are a senior Business Analyst with 15 years of experience gathering requirements for software projects. Your role is to extract complete, unambiguous, testable requirements from the project stakeholder through structured questioning.
 
-For each feature area, produce a checklist where each item is:
-- A single, testable unit of work
-- Tagged with: [backend], [frontend], [test], [style], [infra]
-- Ordered by dependency (what must be built first)
-- Estimated as: trivial / small / medium / large
-- Grouped into implementation phases
+CONTEXT:
+- Project type: [FROM council-config.json project.type]
+- Domain: [FROM council-config.json project.domain]
+- Language/Framework: [FROM council-config.json project.language]
+- Architecture: [FROM council-config.json project.architecture]
+- Broad requirement: [FROM setup answers or user input]
 
-Output: Write `docs/analysis/95-checklists.md`.
+METHODOLOGY:
+You follow a systematic elicitation process. For each area, you ask targeted questions, listen carefully to answers, and probe deeper where ambiguity exists. You NEVER assume requirements — you always confirm.
 
----
+QUESTIONING SEQUENCE:
+1. **Actors & Personas** — Who are the users? What are their roles, permissions, and goals? Are there system actors (cron jobs, external services)?
 
-### Phase 7: Summary & Index
+2. **Core User Stories** — For each actor, what are the primary workflows? Use the format: "As a [role], I want to [action] so that [benefit]." Probe for the complete happy path first, then edge cases.
 
-Write `docs/analysis/00-index.md` with:
-- Table of contents linking to all analysis docs
-- High-level feature summary
-- Key architectural observations (what the source does well, what's complex)
-- Recommended implementation order with rationale
-- Total estimated scope by phase
-- BA review status and any deferred items
+3. **Acceptance Criteria** — For each user story, define testable acceptance criteria. Use Given/When/Then format where appropriate. Ask: "How would you verify this works correctly?"
 
----
+4. **Data Entities & Relationships** — What are the core data objects? What are their attributes? How do they relate to each other? What are the cardinality constraints? Are there lifecycle states?
 
-## Output Format
+5. **Integration Points** — Does this interact with external systems, APIs, or services? What are the contracts? What happens when integrations fail? Are there rate limits, authentication requirements, or data format constraints?
 
-Each analysis file follows this structure:
+6. **Non-Functional Requirements** — What are the performance expectations (response times, throughput)? Availability requirements? Data retention policies? Scalability targets? Accessibility standards?
+
+7. **Edge Cases & Error Scenarios** — What happens when things go wrong? Invalid input, network failures, partial failures, concurrent modifications, data inconsistencies? What are the recovery strategies?
+
+8. **Dependencies & Constraints** — Are there technical constraints (must use specific database, must run on specific infrastructure)? Time constraints? Budget constraints? Regulatory constraints? Backward compatibility requirements?
+
+9. **Out of Scope** — Explicitly confirm what is NOT included to prevent scope creep.
+
+RULES:
+- Ask ONE question at a time using AskUserQuestion.
+- After each answer, acknowledge what you understood and probe if anything is unclear.
+- Adapt your questions based on previous answers — skip irrelevant areas, dive deeper into complex ones.
+- When you have gathered sufficient information for a complete requirements document, announce that you are moving to documentation.
+- If the user says "that's all" or "move on" for a section, respect it but note any gaps.
+- Track which areas have been covered and which remain.
+- For each requirement, mentally assess: Is it Specific? Measurable? Achievable? Relevant? Testable?
+```
+
+**Questioning process:**
+1. Begin with Actors & Personas.
+2. Progress through each area in the sequence above.
+3. After completing all areas (or when the user indicates sufficient information), summarise what was gathered and ask for confirmation before proceeding.
+4. Track any areas the user skipped or answered minimally — these become noted gaps.
+
+### Step 3 — Requirements Documentation
+
+Write requirements to `docs/requirements/NN-<area>.md` where `NN` is a zero-padded sequence number.
+
+**File format:**
 
 ```markdown
-# Feature: <Name>
+# <Area Name> Requirements
 
-## Summary
-One paragraph describing what this feature does.
+**ID:** REQ-<NN>
+**Status:** Draft
+**Created:** <date>
+**Scope:** <whole-project | feature-name>
 
-## User-Visible Behaviour
-Step-by-step description of what the user sees and does.
+## Actors
 
-## Visual Design
-Exact CSS classes, colors, spacing, animations (if from code).
-Design requirements and constraints (if from specs).
-Include literal values wherever possible.
+| Actor | Type | Description |
+|-------|------|-------------|
+| ... | Human/System | ... |
 
-## Data Flow
-API calls → state management → component rendering.
-Include request/response shapes and data models.
+## User Stories
 
-## Interactions
-Event handlers, keyboard shortcuts, validation rules.
-Include specific values, timings, constraints.
+### US-<NN>.1: <Story Title>
 
-## Edge Cases
-Empty states, errors, loading, permission boundaries, large datasets.
+**As a** <role>, **I want to** <action>, **so that** <benefit>.
 
-## Key Files (Reference)
-List of files in the source material with brief purpose notes.
+**Acceptance Criteria:**
+- [ ] **AC-<NN>.1.1:** Given <context>, when <action>, then <result>
+- [ ] **AC-<NN>.1.2:** ...
 
-## Open Questions [ASSUMED]
-Any assumptions made during analysis, pending user confirmation.
+**Priority:** <Must Have | Should Have | Could Have | Won't Have>
+**Complexity:** <S | M | L>
 
-## Implementation Checklist
-- [ ] Item 1 [backend] (small)
-- [ ] Item 2 [frontend] (medium)
-- [ ] Item 3 [test] (small)
+### US-<NN>.2: <Story Title>
+...
+
+## Data Model
+
+### <Entity Name>
+| Attribute | Type | Constraints | Description |
+|-----------|------|-------------|-------------|
+| ... | ... | ... | ... |
+
+**Relationships:**
+- <Entity A> has many <Entity B>
+- ...
+
+## Integration Points
+
+| System | Direction | Protocol | Auth | Error Handling |
+|--------|-----------|----------|------|----------------|
+| ... | Inbound/Outbound | REST/gRPC/Event | ... | ... |
+
+## Non-Functional Requirements
+
+| ID | Category | Requirement | Metric |
+|----|----------|-------------|--------|
+| NFR-<NN>.1 | Performance | ... | ... |
+| NFR-<NN>.2 | Availability | ... | ... |
+
+## Edge Cases & Error Scenarios
+
+| ID | Scenario | Expected Behaviour | Recovery |
+|----|----------|--------------------|----------|
+| EC-<NN>.1 | ... | ... | ... |
+
+## Constraints
+
+- ...
+
+## Out of Scope
+
+- ...
+
+## Open Questions / Gaps
+
+- [ ] ...
 ```
 
-## Integration with Workflow
+**Update `docs/requirements/00-index.md`:**
 
-After `/analyze` completes, the workflow changes:
+```markdown
+# Requirements Index
 
-1. **Phase 0** becomes: "Read `docs/analysis/` + check current implementation against checklists"
-2. **Plan Agent** receives concrete checklists instead of vague feature names
-3. **Spec Compliance Agent** checks against analysis docs instead of re-reading reference code
-4. **No more on-the-fly reference reading** during implementation — everything needed is in the analysis corpus
+| ID | Area | Status | Sprints | Last Updated |
+|----|------|--------|---------|--------------|
+| REQ-01 | <area> | Draft | - | <date> |
+| ... | ... | ... | ... | ... |
+```
 
-## Updating the Corpus
+### Step 4 — Sprint Breakdown
 
-Run `/analyze --area <name>` to update a specific section. The skill will read the existing analysis doc and update it based on current state of the source material.
+Write to `docs/requirements/proposed-sprints.md`.
 
-The BA Review (Phase 5) runs again on updated sections to verify completeness.
+Analyse the requirements and break them into sprints based on:
+- **Dependency ordering** — foundational work first (data models, auth, core entities)
+- **Business value** — highest-value features early
+- **Risk reduction** — tackle unknowns and integrations early
+- **Logical grouping** — related stories together
+- **Size constraints** — each sprint should be achievable in 1-2 weeks of work
+
+**File format:**
+
+```markdown
+# Proposed Sprint Breakdown
+
+**Project:** <project-name>
+**Total Sprints:** <N>
+**Status:** Pending Council Review
+**Approved:** No
+
+## Sprint 1: <Goal>
+
+**Goal:** <one-sentence goal>
+**Complexity:** <S | M | L>
+**Dependencies:** None (foundation sprint)
+
+**Deliverables:**
+- [ ] <deliverable 1> (from US-<NN>.<X>)
+- [ ] <deliverable 2> (from US-<NN>.<Y>)
+- ...
+
+**Exit Criteria:**
+- [ ] <testable criterion 1>
+- [ ] <testable criterion 2>
+- ...
+
+**Notes:** <any context about why these items are grouped or ordered this way>
+
+---
+
+## Sprint 2: <Goal>
+
+**Goal:** <one-sentence goal>
+**Complexity:** <S | M | L>
+**Dependencies:** Sprint 1
+
+**Deliverables:**
+- [ ] ...
+
+**Exit Criteria:**
+- [ ] ...
+
+---
+
+... (repeat for all sprints)
+
+## Dependency Graph
+
+```text
+Sprint 1 (Foundation)
+  |
+  +---> Sprint 2 (Core Feature A)
+  |       |
+  |       +---> Sprint 4 (Feature A Extensions)
+  |
+  +---> Sprint 3 (Core Feature B)
+          |
+          +---> Sprint 5 (Integration)
+```
+
+## Risk Assessment
+
+| Sprint | Risk | Mitigation |
+|--------|------|------------|
+| ... | ... | ... |
+```
+
+### Step 5 — Council Review
+
+This is a HIGH-LEVEL review. The council reviews requirements completeness and sprint planning quality — NOT code.
+
+**Dispatch the council:**
+
+```bash
+./scripts/council-dispatch.py analyze 0 "<project-name>"
+```
+
+The `0` indicates this is round 0 (first review). The dispatch script reads `council-config.json` and invokes each council member for the `analyze` phase in the configured order.
+
+**Council members active in the analyze phase:**
+
+| Order | Member | Review Focus |
+|-------|--------|-------------|
+| 1 | Architecture | Sprint boundaries respect architectural layers. Dependencies are correctly ordered. No circular dependencies. Proposed architecture can support all requirements. |
+| 2 | Spec Compliance | Every user story has testable acceptance criteria. No ambiguous requirements. No contradictions between requirements. All actors are covered. |
+| 3 | Security | Security-sensitive requirements are identified. Auth/authz requirements are complete. Data handling requirements address sensitivity. Threat surface is understood. |
+| 4 | Domain Expert | Domain terminology is used correctly. Domain-specific edge cases are captured. Standards compliance is addressed in requirements. Business rules are complete. |
+| 5 | Arbitrator | Synthesises all findings. Produces final verdict: APPROVE, REVISE, or REJECT. |
+
+**Each member receives:**
+- The full contents of `docs/requirements/` (all requirement files)
+- The `docs/requirements/proposed-sprints.md` file
+- Their specific lens prompt from `council-config.json`
+- The project context (type, domain, language, architecture)
+
+**Findings are written to:** `docs/findings/analyze-findings.md`
+
+**Findings format:**
+
+```markdown
+# Analysis Phase — Council Findings
+
+**Round:** <N>
+**Date:** <date>
+**Verdict:** <APPROVE | REVISE | REJECT>
+
+## Architecture Review
+- [ARCH-1] <severity> — <finding>
+- [ARCH-2] <severity> — <finding>
+
+## Spec Compliance Review
+- [SPEC-1] <severity> — <finding>
+- [SPEC-2] <severity> — <finding>
+
+## Security Review
+- [SEC-1] <severity> — <finding>
+- [SEC-2] <severity> — <finding>
+
+## Domain Expert Review
+- [DOM-1] <severity> — <finding>
+- [DOM-2] <severity> — <finding>
+
+## Arbitrator Assessment
+
+### Convergence Points
+- ...
+
+### Divergence Points
+- ...
+
+### Gaps Identified
+- ...
+
+### Required Changes (for REVISE)
+1. ...
+2. ...
+
+### Verdict: <APPROVE | REVISE | REJECT>
+<reasoning>
+```
+
+**Present findings to the user:**
+After the council completes, display:
+1. The arbitrator's verdict
+2. A summary of findings grouped by severity (Critical > High > Medium > Low)
+3. The number of required changes (if REVISE)
+
+### Step 6 — Iteration
+
+If the verdict is **REVISE**:
+
+1. Present the required changes to the user.
+2. Ask the user how they want to proceed:
+   ```
+   AskUserQuestion(
+     question: "The council recommends revisions. How would you like to proceed?",
+     options: ["Address all findings — update requirements and re-submit", "Address selected findings — let me choose which ones", "Override — approve as-is with noted exceptions", "Discuss — I have questions about the findings"]
+   )
+   ```
+
+3. If addressing findings:
+   - Walk through each required change
+   - Update the requirements documents
+   - Update the sprint breakdown if needed
+   - Re-submit to council: `./scripts/council-dispatch.py analyze <round> "<project-name>"`
+   - Increment the round number
+
+4. **Convergence guardrails:**
+   - Track the current round number against `convergence.max_analyze_rounds` from `council-config.json`
+   - At `convergence.convergence_warning_at` rounds, warn the user: "This analysis has gone through N review rounds. Consider approving with noted exceptions to avoid analysis paralysis."
+   - At `convergence.max_analyze_rounds`, force a decision: approve as-is, approve with exceptions, or escalate.
+
+5. **Findings tracker:**
+   - Maintain a running tally in `docs/findings/analyze-findings.md`
+   - Each round's findings are appended (not overwritten)
+   - Track which findings from previous rounds have been addressed
+   - Format: `[ADDRESSED]` or `[OPEN]` prefix on each finding
+
+If the verdict is **REJECT**:
+- Present the fundamental problems identified
+- These typically indicate the requirements need significant rework
+- Guide the user back through the BA questioning for the problematic areas
+- This counts as a new round
+
+If the verdict is **APPROVE**:
+- Proceed directly to Step 7
+
+### Step 7 — Approval Gate
+
+Once the council approves (or the user overrides):
+
+1. **Mark requirements as approved:**
+   Update the status in each requirements file from `Draft` to `Approved`.
+
+2. **Mark sprint breakdown as approved:**
+   Update `docs/requirements/proposed-sprints.md`:
+   ```markdown
+   **Approved:** Yes
+   **Approved Date:** <date>
+   **Approval Type:** <Council Approved | User Override>
+   **Council Rounds:** <N>
+   **Open Exceptions:** <count or "None">
+   ```
+
+3. **Update the requirements index:**
+   Update `docs/requirements/00-index.md` with current statuses and sprint assignments.
+
+4. **Archive findings:**
+   Copy the final `docs/findings/analyze-findings.md` to `docs/archive/analyze-findings-<date>.md`.
+
+5. **Present summary to user:**
+   ```
+   Analysis complete.
+   - Requirements: <N> areas documented
+   - User stories: <N> total
+   - Sprints: <N> proposed
+   - Council rounds: <N>
+   - Open exceptions: <N or "None">
+
+   Next step: Run `/sprint` to begin planning Sprint 1.
+   ```
+
+---
+
+## Maintenance
+
+This skill may be re-invoked in two scenarios:
+
+1. **New feature analysis** — When adding a major feature to an existing project. The new requirements are added alongside existing ones, and sprint breakdown is updated.
+
+2. **Post-retrospective revision** — After `/retrospective` identifies requirement gaps or changes. The retrospective skill may recommend re-running `/analyze` for specific areas.
+
+When re-invoked:
+- Existing approved requirements are NOT modified unless explicitly requested
+- New requirements get the next sequence number
+- Sprint breakdown is updated to integrate new work with remaining sprints
+- Council review covers only the new/changed requirements
+
+---
+
+## Enforcement
+
+- The `/sprint` skill checks for the presence of `**Approved:** Yes` in `docs/requirements/proposed-sprints.md` before proceeding.
+- If not found, it directs the user to run `/analyze` first.
+- The approval marker serves as the gate between analysis and sprint planning.

@@ -9,7 +9,9 @@
       "Grep(*)",
       "Agent(*)",
       "Skill(*)",
-      "ToolSearch(*)"
+      "ToolSearch(*)",
+      "WebSearch(*)",
+      "WebFetch(*)"
     ]
   }
 }

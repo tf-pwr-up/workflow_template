@@ -1,0 +1,409 @@
+# workflow-gate.yml — PR gate for the council-driven workflow.
+#
+# Runs on every pull request targeting main. Enforces that:
+#   1. Council review artifacts exist (findings tracker)
+#   2. A sprint/analysis plan exists
+#   3. The latest findings tracker shows APPROVED verdict
+#   4. The project's test suite passes
+#   5. Tracked workflow files have not been modified without authorisation
+#
+# This workflow is the enforcement boundary — code cannot merge to main
+# without passing these checks. It complements the council review process
+# by ensuring review artifacts are present and valid in the PR itself.
+
+name: Workflow Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR to save CI minutes.
+concurrency:
+  group: workflow-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Configurable test command. Override in repository settings > Secrets and
+# variables > Actions > Variables if your project uses something other than
+# the defaults below.
+env:
+  # The command to run the project's test suite. Set this as a repository
+  # variable (TEST_COMMAND) to override. Falls back to common conventions.
+  TEST_COMMAND: ${{ vars.TEST_COMMAND || '' }}
+
+  # The template repository (owner/repo) that workflow files are synced from.
+  # Used by the workflow-edits check to verify sync PRs exist.
+  TEMPLATE_REPO: ${{ vars.TEMPLATE_REPO || 'timfrench/workflow-template' }}
+
+jobs:
+  gate:
+    name: PR Gate Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      # -------------------------------------------------------------------
+      # Checkout the PR branch with enough history to diff against base.
+      # We fetch the base branch too so we can compute a proper diff of
+      # which files were changed in this PR.
+      # -------------------------------------------------------------------
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -------------------------------------------------------------------
+      # Check 1: Review artifacts exist
+      #
+      # The council review process writes findings trackers to docs/findings/.
+      # At least one must be present — this proves a review was actually run
+      # rather than skipped.
+      # -------------------------------------------------------------------
+      - name: Check review artifacts exist
+        id: review-artifacts
+        run: |
+          echo "Checking for council review findings trackers..."
+          if find docs/findings/ -name '*-findings.md' -type f 2>/dev/null | grep -q .; then
+            count=$(find docs/findings/ -name '*-findings.md' -type f | wc -l | tr -d ' ')
+            echo "Found $count findings tracker(s) in docs/findings/"
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No findings tracker found in docs/findings/. Run a council review before merging."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------------------------
+      # Check 2: Plan exists
+      #
+      # Every sprint must have a plan in docs/plans/. For analysis reviews,
+      # the requirements docs serve as the plan. At least one plan or
+      # requirements document must exist.
+      # -------------------------------------------------------------------
+      - name: Check plan exists
+        id: plan-exists
+        run: |
+          echo "Checking for sprint plans or requirements..."
+          has_plan=false
+
+          if find docs/plans/ -name '*.md' -type f 2>/dev/null | grep -q .; then
+            count=$(find docs/plans/ -name '*.md' -type f | wc -l | tr -d ' ')
+            echo "Found $count plan(s) in docs/plans/"
+            has_plan=true
+          fi
+
+          if find docs/requirements/ -name '*.md' -type f 2>/dev/null | grep -q .; then
+            count=$(find docs/requirements/ -name '*.md' -type f | wc -l | tr -d ' ')
+            echo "Found $count requirements doc(s) in docs/requirements/"
+            has_plan=true
+          fi
+
+          if [ "$has_plan" = true ]; then
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No plan found in docs/plans/ and no requirements in docs/requirements/. Create a plan before merging."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------------------------
+      # Check 3: Approved verdict
+      #
+      # Parse the most recently modified findings tracker for an APPROVED
+      # verdict. The council review writes "Verdict: APPROVED" or
+      # "Verdict: CHANGES_REQUESTED" in the tracker. We require APPROVED.
+      # -------------------------------------------------------------------
+      - name: Check approved verdict
+        id: verdict
+        run: |
+          echo "Checking for APPROVED verdict in latest findings tracker..."
+
+          # Find the most recently modified findings tracker.
+          latest=$(find docs/findings/ -name '*-findings.md' -type f -printf '%T@ %p\n' 2>/dev/null \
+                   | sort -rn | head -1 | cut -d' ' -f2-)
+
+          if [ -z "$latest" ]; then
+            echo "::error::No findings tracker found — cannot check verdict."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Latest findings tracker: $latest"
+
+          # Extract the verdict line.
+          verdict_line=$(grep -E '^\s*\-?\s*\*?\*?Verdict\*?\*?\s*:' "$latest" | head -1 || true)
+
+          if [ -z "$verdict_line" ]; then
+            echo "::error::No verdict found in $latest. The council review may not have completed."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Verdict line: $verdict_line"
+
+          if echo "$verdict_line" | grep -q 'APPROVED'; then
+            if echo "$verdict_line" | grep -q 'CHANGES_REQUESTED'; then
+              echo "::error::Latest verdict is CHANGES_REQUESTED. Address the council's findings before merging."
+              echo "status=fail" >> "$GITHUB_OUTPUT"
+            else
+              echo "Verdict is APPROVED."
+              echo "status=pass" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "::error::Latest verdict is not APPROVED ($verdict_line). Address findings before merging."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------------------------
+      # Check 4: Tests pass
+      #
+      # Run the project's test suite. The test command is configurable via
+      # the TEST_COMMAND repository variable. If not set, we auto-detect
+      # common test runners (npm test, pytest, go test, cargo test, make test).
+      # -------------------------------------------------------------------
+      - name: Detect runtime
+        id: detect
+        run: |
+          # Set up the test command, auto-detecting if not configured.
+          if [ -n "$TEST_COMMAND" ]; then
+            echo "Using configured TEST_COMMAND: $TEST_COMMAND"
+            echo "cmd=$TEST_COMMAND" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "TEST_COMMAND not set — auto-detecting test runner..."
+
+          if [ -f "package.json" ]; then
+            echo "cmd=npm test" >> "$GITHUB_OUTPUT"
+            echo "Detected: npm test"
+          elif [ -f "pytest.ini" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+            echo "cmd=python3 -m pytest" >> "$GITHUB_OUTPUT"
+            echo "Detected: pytest"
+          elif [ -f "go.mod" ]; then
+            echo "cmd=go test ./..." >> "$GITHUB_OUTPUT"
+            echo "Detected: go test"
+          elif [ -f "Cargo.toml" ]; then
+            echo "cmd=cargo test" >> "$GITHUB_OUTPUT"
+            echo "Detected: cargo test"
+          elif [ -f "Makefile" ] && grep -q '^test:' Makefile; then
+            echo "cmd=make test" >> "$GITHUB_OUTPUT"
+            echo "Detected: make test"
+          else
+            echo "cmd=" >> "$GITHUB_OUTPUT"
+            echo "::warning::No test runner detected and TEST_COMMAND not set. Skipping tests."
+          fi
+
+      - name: Set up Node.js
+        if: steps.detect.outputs.cmd == 'npm test'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up Python
+        if: contains(steps.detect.outputs.cmd, 'pytest')
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies (Node)
+        if: steps.detect.outputs.cmd == 'npm test'
+        run: npm ci
+
+      - name: Install dependencies (Python)
+        if: contains(steps.detect.outputs.cmd, 'pytest')
+        run: |
+          pip install -r requirements.txt 2>/dev/null || true
+          pip install pytest 2>/dev/null || true
+
+      - name: Run tests
+        id: tests
+        if: steps.detect.outputs.cmd != ''
+        run: |
+          echo "Running: ${{ steps.detect.outputs.cmd }}"
+          if ${{ steps.detect.outputs.cmd }}; then
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Test suite failed. Fix failing tests before merging."
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip tests (no runner)
+        id: tests-skip
+        if: steps.detect.outputs.cmd == ''
+        run: |
+          echo "::warning::No test command available. Skipping test check."
+          echo "status=skip" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------------
+      # Check 5: No unapproved workflow edits
+      #
+      # Workflow files (.claude/skills/, .claude/workflow-rules.md,
+      # scripts/council-*) are shared across projects via a template repo.
+      # If any of these files are modified in the PR, we check whether:
+      #   a) The changes are marked as project-specific overrides in CLAUDE.md
+      #   b) A corresponding sync PR exists on the template repo
+      # This prevents accidental drift between the project and the template.
+      # -------------------------------------------------------------------
+      - name: Check for unapproved workflow edits
+        id: workflow-edits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Checking for workflow file modifications..."
+
+          # Get the list of files changed in this PR compared to the base branch.
+          base_ref="${{ github.event.pull_request.base.sha }}"
+          changed_files=$(git diff --name-only "$base_ref"...HEAD)
+
+          # Define tracked workflow file patterns.
+          tracked_patterns=(
+            ".claude/skills/"
+            ".claude/workflow-rules.md"
+            "scripts/council-dispatch.py"
+            "scripts/council-check.sh"
+          )
+
+          modified_workflow_files=()
+          for file in $changed_files; do
+            for pattern in "${tracked_patterns[@]}"; do
+              if [[ "$file" == "$pattern"* ]] || [[ "$file" == "$pattern" ]]; then
+                modified_workflow_files+=("$file")
+              fi
+            done
+          done
+
+          if [ ${#modified_workflow_files[@]} -eq 0 ]; then
+            echo "No tracked workflow files modified."
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Modified workflow files:"
+          printf "  - %s\n" "${modified_workflow_files[@]}"
+
+          # Check if changes are marked as project-specific overrides.
+          has_override_section=false
+          if [ -f "CLAUDE.md" ]; then
+            if grep -q "Workflow Overrides" CLAUDE.md; then
+              has_override_section=true
+              echo "Found 'Workflow Overrides' section in CLAUDE.md."
+
+              # Check if each modified file is listed in the overrides section.
+              all_overridden=true
+              for wf in "${modified_workflow_files[@]}"; do
+                if ! grep -q "$wf" CLAUDE.md; then
+                  echo "  Warning: $wf is modified but not listed in Workflow Overrides"
+                  all_overridden=false
+                fi
+              done
+
+              if [ "$all_overridden" = true ]; then
+                echo "All modified workflow files are listed as project-specific overrides."
+                echo "status=pass" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+
+          # Check for a corresponding sync PR on the template repo.
+          # This is a best-effort check — if we cannot query the template
+          # repo (permissions, network), we warn instead of failing hard.
+          sync_pr_found=false
+          if command -v gh &>/dev/null && [ -n "${GH_TOKEN:-}" ]; then
+            echo "Checking for sync PRs on $TEMPLATE_REPO..."
+            sync_prs=$(gh pr list --repo "$TEMPLATE_REPO" --state open --limit 20 \
+                       --json title,url 2>/dev/null || echo "[]")
+
+            if [ "$sync_prs" != "[]" ] && [ -n "$sync_prs" ]; then
+              # Look for a PR that references this project or these files.
+              repo_name=$(basename "$(git remote get-url origin 2>/dev/null || echo 'unknown')" .git)
+              if echo "$sync_prs" | grep -qi "$repo_name"; then
+                sync_pr_found=true
+                echo "Found sync PR on template repo referencing this project."
+              fi
+            fi
+          fi
+
+          if [ "$sync_pr_found" = true ]; then
+            echo "Sync PR exists on template repo. Workflow edits are authorised."
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Tracked workflow files have been modified without a corresponding sync PR or override declaration."
+            echo "::warning::Modified files: ${modified_workflow_files[*]}"
+            echo "::warning::Either sync changes to $TEMPLATE_REPO or add a 'Workflow Overrides' section to CLAUDE.md."
+            # This is a warning, not a hard failure — the team may intentionally
+            # diverge. The warning ensures visibility in the PR checks.
+            echo "status=warn" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -------------------------------------------------------------------
+      # Final summary — aggregate all check results and report.
+      # -------------------------------------------------------------------
+      - name: Gate summary
+        if: always()
+        run: |
+          echo ""
+          echo "=============================="
+          echo "  Workflow Gate — Summary"
+          echo "=============================="
+          echo ""
+
+          failed=false
+
+          # Check 1: Review artifacts
+          status="${{ steps.review-artifacts.outputs.status }}"
+          if [ "$status" = "pass" ]; then
+            echo "  ✓ Review artifacts exist"
+          else
+            echo "  ✗ Review artifacts missing"
+            failed=true
+          fi
+
+          # Check 2: Plan exists
+          status="${{ steps.plan-exists.outputs.status }}"
+          if [ "$status" = "pass" ]; then
+            echo "  ✓ Plan exists"
+          else
+            echo "  ✗ Plan missing"
+            failed=true
+          fi
+
+          # Check 3: Approved verdict
+          status="${{ steps.verdict.outputs.status }}"
+          if [ "$status" = "pass" ]; then
+            echo "  ✓ Council verdict: APPROVED"
+          else
+            echo "  ✗ Council verdict: not approved"
+            failed=true
+          fi
+
+          # Check 4: Tests
+          test_status="${{ steps.tests.outputs.status }}"
+          skip_status="${{ steps.tests-skip.outputs.status }}"
+          if [ "$test_status" = "pass" ]; then
+            echo "  ✓ Tests passed"
+          elif [ "$skip_status" = "skip" ]; then
+            echo "  ⚠ Tests skipped (no test runner detected)"
+          else
+            echo "  ✗ Tests failed"
+            failed=true
+          fi
+
+          # Check 5: Workflow edits
+          status="${{ steps.workflow-edits.outputs.status }}"
+          if [ "$status" = "pass" ]; then
+            echo "  ✓ No unapproved workflow edits"
+          elif [ "$status" = "warn" ]; then
+            echo "  ⚠ Workflow files modified — sync PR or override recommended"
+          else
+            echo "  ✓ No workflow file changes"
+          fi
+
+          echo ""
+
+          if [ "$failed" = true ]; then
+            echo "Gate: FAILED — address the issues above before merging."
+            exit 1
+          else
+            echo "Gate: PASSED — all required checks satisfied."
+          fi

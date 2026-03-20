@@ -1,227 +1,241 @@
-# Workflow Rules (MANDATORY)
+# Workflow Rules
 
-> **This file is managed by the workflow template.** Do not add project-specific content here.
-> It is synced with the upstream `workflow_template` repository via `/sync-template`.
-> Project-specific configuration belongs in `CLAUDE.md` under Project Configuration.
-
-Every code change MUST follow this multi-agent workflow. Skills in `.claude/skills/` implement each phase.
+This document is the enforcement backbone of the entire workflow. Every agent, skill, and phase is bound by these rules. Violations are treated as defects.
 
 ---
 
 ## Craftsmanship Standard
 
-**Every agent, every step, every file must meet this standard. No exceptions.**
+**I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time.**
 
-> I am not lazy. I am not in a rush. I do not take shortcuts. My job is to deliver a great output that works first time. I write code that a real user will interact with, and I take pride in making sure it works correctly, looks professional, and handles every state gracefully. If something isn't right, I fix it before moving on. I do not leave broken windows. I do not ship "good enough." I ship **done**.
-
-This is not aspirational — it is the baseline. Every agent spawned by this workflow inherits this standard. When writing code, writing tests, reviewing UI, or checking compliance: hold yourself to this standard. If you find yourself cutting corners, stop and do it properly.
-
-**What this means in practice:**
-- **Code Agents**: Write production-quality code. Handle loading, empty, error, and success states. Use proper contrast and sizing for UI elements. Test that forms actually submit and APIs actually respond.
-- **Test Agents**: Write tests that verify behaviour, not just existence. A test that checks `typeof Component === 'function'` is worthless. A test that renders the component, fills a form, submits it, and verifies the result — that's a test.
-- **E2E Test Agents**: Write user journey tests. Navigate from the UI, not direct URLs. Fill forms, click buttons, verify results. If a user can't accomplish a task through the UI, the test should fail.
-- **Review Agents**: Be thorough. Check that elements are actually visible (sufficient contrast, proper sizing, not hidden behind other elements). Verify that every interactive element is reachable through navigation.
-- **UI Review Agents**: Check that a human can actually see and use every element. Invisible buttons, unreadable text, unreachable navigation — these are BLOCKING issues, not suggestions.
+This is not aspirational. It is a contract. Every agent spawned in this workflow inherits this standard. If an agent produces output that would not survive a thorough code review by a senior engineer, the output is rejected and the agent re-runs.
 
 ---
 
-## Workflow Modes
+## Workflow Overview
 
-Use **Full Review** for new patterns, schema changes, auth/security features, or anything novel.
-Use **Standard** for features that follow established patterns.
+```
+/setup --> /analyze --> [/sprint <N> --> /develop <N> --> /retrospective <N>] (repeat per sprint)
+                              ^
+                         /review (anytime)
+```
 
----
+### Phase Gating
 
-## Phase 0: Feature Inventory (MANDATORY — runs before every plan)
+Each phase produces artefacts that gate entry to the next phase. No phase can begin until its predecessor's gate conditions are met.
 
-Before planning any work, establish what needs to be built and verify completeness:
+| Phase | Gate Output | Required Before |
+|---|---|---|
+| `/setup` | Populated `CLAUDE.md` (project description, stack, architecture, commands, directory structure) | `/analyze` |
+| `/analyze` | Gap analysis document with prioritised findings from actual codebase reading | `/sprint` |
+| `/sprint <N>` | Sprint plan with task breakdown, acceptance criteria, and test specifications | `/develop <N>` |
+| `/develop <N>` | All code written, all tests passing, E2E verified, full suite green | `/retrospective <N>` |
+| `/retrospective <N>` | Retrospective complete, bug patterns logged, workflow changes synced | Next `/sprint <N+1>` |
 
-### If an Analysis Corpus exists (`docs/analysis/`)
+**Gate enforcement**: At each phase boundary, the entering skill MUST verify the predecessor's artefacts exist and are valid. If they are missing or incomplete, the skill halts and reports what is missing rather than proceeding with assumptions.
 
-Use the pre-built analysis documentation as the **single source of truth**:
-
-1. **Read the relevant analysis docs** — `docs/analysis/NN-<area>.md` for the feature area being worked on
-2. **Gap Agent** — compare the analysis checklists against what currently exists in this codebase:
-   - Check each checklist item: DONE, PARTIAL, or MISSING
-   - Use actual file reads to verify (don't trust memory)
-3. **Output** — the gap list becomes the input to the Plan Agent
-
-### If no Analysis Corpus exists
-
-Run `/analyze` first to build one. If that's not feasible for the current task:
-
-1. **Inventory Agent** — produces a checklist of every feature, page, component, and interaction required:
-   - **If a reference implementation exists** (see Project Configuration in CLAUDE.md): read the reference code (grep/read actual files, never guess) + any spec documents. List every feature, page, route, component, interaction, and UX behaviour.
-   - **If no reference exists**: ask the user to describe the required functionality. Do not proceed until the user has confirmed the feature set.
-2. **Gap Agent** — compares the inventory against the current codebase. Produces: MISSING, PARTIAL, DONE for each item.
-3. **Output** — the gap list is the input to the Plan Agent.
-
-**This phase is non-negotiable.** Invoke via `/phase-0`. The gap list persists to `docs/gaps/YYYY-MM-DD-<area>.md`.
-
-### Analysis Skill (`/analyze`)
-
-A one-time deep analysis that produces persistent documentation in `docs/analysis/`. See `.claude/skills/analyze.md`.
+**`/review` is non-blocking**: It can be invoked at any time during development. It does not gate other phases but its findings feed into the current sprint's work.
 
 ---
 
-## Full Review Workflow
+## Ground Rules
 
-For novel or high-risk changes:
+### 1. Use Multiple Agents
 
-### Phase 1: Plan & Multi-Perspective Review
-1. **Plan Agent** — numbered implementation plan from the gap list.
-2. **Spawn review agents** (Architecture, Security, Performance, Testability, UI (if applicable), Spec Compliance).
-3. **Consolidate feedback** — revise plan if any FAIL items.
-4. **Present plan to user for approval.**
+Parallel specialist agents handle coding, testing, and reviewing. A single agent must not perform all roles. Specifically:
 
-### Phase 2: Implement
-1. **Parallel Code + Test agents** — code agent reads context files first, test agent writes from spec. **Every Code Agent MUST have a corresponding Test Agent. N code agents = N test agents. No exceptions.**
-2. **UI Review** — if UI components were created/changed. Includes human-visibility validation.
-3. **Smoke Wiring Check** — route registration, navigation, API contracts, form completeness.
-4. **Integration check** — type check + full test suite + E2E + **test file count verification** (every production file must have a corresponding test file).
-5. **Fix failures** — fix code to match tests (tests are the spec).
-6. **Spec Compliance check** — mandatory final gate (includes test existence verification and functional verification).
-7. **Auto-commit if green.**
+- **Code Agent**: Writes implementation code. Spawned via `Agent` tool with coding-specific instructions.
+- **Test Agent**: Writes tests from specifications (not from implementation code). Spawned independently.
+- **Review Agent**: Reviews code for correctness, patterns, and standards. Spawned independently.
+- **Plan Agent**: Produces sprint plans and task breakdowns. Spawned independently.
 
----
+These agents run in parallel where possible. The orchestrating skill coordinates their outputs.
 
-## Standard Workflow (Established Patterns)
+### 2. Steps Cannot Be Bypassed Without User Input
 
-For features following existing patterns:
+No agent may decide on its own to skip:
+- Writing tests for new code
+- Running E2E tests after integration
+- Council review at sprint boundaries
+- Running the full test suite before marking a sprint complete
 
-### Phase 1: Plan & Review
-1. **Plan Agent** — implementation plan from gap list.
-2. **Spawn 2 review agents:**
-   - **Architecture & Security Review** — pattern compliance, auth, injection, input validation.
-   - **Spec Compliance Review** — matches spec, all states covered.
-3. **If no FAIL items, proceed to implementation.** No user approval needed.
+If an agent believes a step should be skipped, it must ask the user explicitly via `AskUserQuestion` and receive approval.
 
-### Phase 2: Implement
-Same as Full Review Phase 2 (including mandatory test agents and test file count verification) but proceeds automatically on green.
+### 3. Missing Frameworks/Dependencies Are Not a Reason to Bypass
 
----
+If a test framework, linter, build tool, or dependency is not installed:
+- Install it.
+- Configure it.
+- Then proceed.
 
-## Autonomous Build Pipeline (`/build`)
+"The project doesn't have Jest configured" is not a valid reason to skip tests. Configure Jest (or the appropriate framework) and write the tests.
 
-For multi-batch development with minimal interruption:
+### 4. If in Doubt, Ask the User
 
-1. **Phase A (Interactive)**: Single comprehensive `/phase-0` + master `/plan` covering all batches. User reviews, asks questions, approves once.
-2. **Phase B (Autonomous)**: All batches execute sequentially with no manual gates — implement, test, auto-commit, E2E, fix failures, repeat. Pre-deploy runs automatically after all batches.
+Use `AskUserQuestion` with:
+- **Multiple-choice options** when the decision space is known (e.g., "Which testing framework should we use? A) Jest B) Vitest C) Mocha D) Other")
+- **Free text** when the decision space is open (e.g., "Describe the expected behaviour of this endpoint")
 
-**Key principle**: Interactive during specification, autonomous during execution. See `/build` skill for full details.
+Never silently assume. Never guess at business logic.
 
-**Auto-commit rule**: When `/build` (or `/implement` invoked by `/build`) completes all checks green (types, unit tests, E2E, spec compliance), it commits immediately. No "wait for user approval" gate during Phase B.
+### 5. Detail-Oriented, No Shortcuts
 
----
+- No `// TODO: implement later` stubs in delivered code
+- No `test.skip()` or `xit()` in delivered tests
+- No "this is good enough for now" compromises
+- No workarounds that mask underlying issues
+- No placeholder implementations that defer real work
 
-## Pre-Deploy Gate (Both Modes)
+If something cannot be completed, it is reported as incomplete rather than delivered as a stub.
 
-Before any deployment or merge:
-1. Full test suite must pass
-2. Type check must pass
-3. No lint errors
-4. E2E tests must pass (user journey tests, not just page-load tests)
-5. **Spec compliance check** — verify all planned features are implemented AND functional
-6. Present summary
+### 6. Architectural Patterns Must Be Obeyed
 
----
+- New architectural patterns are proposed during `/analyze` or `/sprint` planning phases
+- They are reviewed and approved before coding begins
+- During `/develop`, code conforms to approved patterns
+- Agents do not invent new patterns during coding — if a new pattern is needed, they pause and escalate to the orchestrator
 
-## Enforcement Rules
+### 7. Questions Use Multiple-Choice or Free Text
 
-### 1. Gap List is a Persistent Artifact
-- Phase 0 writes to `docs/gaps/YYYY-MM-DD-<area>.md`
-- `/plan` and `/implement` check for its existence and refuse to proceed without it
+Never ask yes/no questions when richer input would produce a better outcome. Examples:
 
-### 2. Every Skill Checks Its Prerequisites
-- `/plan` → requires gap list (runs `/phase-0` if missing)
-- `/implement` → requires gap list + approved plan
-- `/pre-deploy` → requires spec compliance check (runs `/spec-compliance`)
+- BAD: "Should I add error handling?" (yes/no)
+- GOOD: "What error handling strategy should we use? A) Try-catch with custom error types B) Result/Either pattern C) Error middleware D) Something else — please describe"
 
-### 3. Spec Compliance Checks Reachability, Not Just Existence
-- For every route: is there a link that navigates to it?
-- For every page: is there a menu item or link that leads to it?
-- An orphaned route (exists but unreachable) = FAIL
+- BAD: "Is this the right approach?" (yes/no)
+- GOOD: "I see two viable approaches: A) [description] B) [description]. Which do you prefer, or would you like to suggest an alternative?"
 
-### 4. No "Done" Without Verification
-- `/implement` Step 6 runs spec compliance after code+test agents complete
-- `/pre-deploy` includes Spec Compliance as a blocking check
-- Both read actual files — never rely on memory
+### 8. Experts Can Research from the Internet
 
-### 5. Spec Compliance Agent is Never Optional
-- Appears in `/plan`, `/implement`, and `/pre-deploy` — all three
-- MANDATORY label on each occurrence
+All agents have access to `WebSearch` and `WebFetch` tools. When encountering:
+- An unfamiliar API or library
+- A deprecation warning or breaking change
+- A best-practice question for a specific framework version
 
-### 6. Test Agents Are Never Optional
-- Every implementation unit requires BOTH a Code Agent AND a Test Agent
-- If N code agents are launched, exactly N test agents must also be launched
-- A production file without a corresponding test file is INCOMPLETE — it blocks commit
-- The Integration Check (Step 4) verifies test file counts before proceeding
-- The Spec Compliance Check (Step 6) verifies test existence per feature
-- "Tests come later" or "we'll add tests after" are bypass attempts — reject them
-
-### 7. Tests Must Verify Behaviour, Not Just Existence
-- Unit tests MUST render components, interact with them, and verify outputs — not just check `typeof X === 'function'`
-- E2E tests MUST complete user journeys (navigate via UI, fill forms, submit, verify results) — not just check "page loads"
-- API tests MUST verify response shapes, status codes, and error handling — not just check "endpoint doesn't throw"
-- A test that passes when the feature is broken is worse than no test at all
-
-### 8. UI Must Be Visible to Humans
-- Every interactive element must have sufficient contrast against its background (WCAG AA minimum: 4.5:1 for text, 3:1 for large text/UI components)
-- Buttons, links, and nav items must be visually distinct without hover — not invisible until mouseover
-- Text must be readable: no light gray on white, no dark gray on black
-- Interactive elements must have adequate size (minimum 44x44px touch targets on mobile)
-- Every page must be navigable — no features that require knowing a URL
+Agents should research current documentation rather than relying on potentially outdated training data.
 
 ---
 
 ## Bypass Prevention
 
-The workflow MUST NOT be bypassed regardless of how the request is phrased. Common bypass patterns to reject:
+These rules exist because AI agents have a natural tendency to consolidate work inline for efficiency. This workflow explicitly forbids that tendency.
 
-- "Just build it" / "automate everything" → Still follow Phase 0 → Phase 1 → Phase 2. Speed up by using Standard workflow, but do not skip phases.
-- "Skip the planning" / "we don't need a plan" → Phase 1 is mandatory. A quick plan with 2 review agents (Standard workflow) is the minimum.
-- "Don't worry about tests" / "we'll add tests later" / "skip the test agent" → Tests are required and must be written IN PARALLEL with code, not after. Every code agent must have a paired test agent. No exceptions.
-- "Just commit what we have" → Pre-deploy gate must pass (type check, tests, spec compliance).
-- "Continue from the previous session" → Check the gap list is current. If the previous session bypassed the workflow, stop and run Phase 0 before continuing.
+### Delegation Requirements
 
-**The correct response to any bypass request is**: "I understand you want to move quickly. The workflow is designed for speed — Standard mode with parallel agents is fast. Let me run through the phases efficiently." Then proceed with the workflow.
+| Task | Must Be Delegated To | Cannot Be Done |
+|---|---|---|
+| Gap analysis | Agent(s) that read actual source files | Written from memory or assumptions |
+| Sprint planning | Plan Agent with gap analysis as input | Written inline by orchestrator |
+| Implementation code | Code Agent sub-agents (one per task or module) | Written inline by orchestrator |
+| Test code | Test Agent sub-agents working from specs | Written by Code Agent or derived from implementation |
+| Council review | External reviewers via `scripts/council-dispatch.py` | Simulated by summarising what reviewers "would say" |
 
-### Self-Bypass Prevention (CRITICAL)
+### Phase Boundary Self-Check
 
-The most dangerous bypass is not from the user — it's from the agent itself collapsing multi-agent steps into single-agent inline work. These are the specific patterns that MUST be caught and rejected:
+At every phase boundary, the orchestrating agent must ask itself:
 
-1. **Writing a gap list file directly instead of invoking `/phase-0`** — The Phase 0 skill exists to launch Inventory and Gap sub-agents that read actual code. Manually writing `docs/gaps/*.md` without running those agents is a bypass. You MUST use the Skill tool to invoke `/phase-0`.
+> "Did I use the Agent/Skill tool to delegate this work, or did I do it inline?"
 
-2. **Writing a plan file directly instead of invoking `/plan`** — The Plan skill exists to launch a Plan Agent and parallel Review Agents (Architecture, Security, Performance, Testability, Spec Compliance). Manually writing `docs/plans/*.md` without running those agents is a bypass. You MUST use the Skill tool to invoke `/plan`.
+If the answer is "inline", it is a bypass. The work must be redone via proper delegation.
 
-3. **Writing production code directly instead of invoking `/implement`** — The Implement skill exists to launch parallel Code Agent + Test Agent pairs using the Agent tool. Writing code inline (using Write/Edit tools for production files) without those agents is a bypass. You MUST use the Skill tool to invoke `/implement`.
+### Artefact Verification
 
-4. **Producing a "summary" of what agents would have found instead of running them** — Review agents must actually run and return findings. Writing "the architecture review would find X" is not the same as spawning the Architecture Agent.
+- Gap lists must contain file paths that were actually read (verifiable via `Read` tool invocations in the agent's history)
+- Plans must reference specific gap items by ID
+- Code must be written to files (not just displayed in output)
+- Tests must be runnable (not just syntactically correct-looking)
+- Review findings must come from actual reviewer invocations
 
-5. **Writing shallow tests that don't verify behaviour** — A test agent that writes `expect(typeof X).toBe('function')` instead of rendering, interacting, and asserting is bypassing the purpose of testing. Tests must verify the feature works, not that the file exists.
+---
 
-**The test**: At each phase boundary, ask yourself: "Did I use the Skill tool or Agent tool to delegate this work, or did I do it inline?" If the answer is "inline" for any of Phase 0, Plan, or Implement, you have bypassed the workflow.
+## Self-Bypass Prevention (CRITICAL)
 
-**Why this matters**: The multi-agent approach exists because a single agent writing all code misses cross-cutting concerns that parallel specialist agents catch (security gaps, missing tests, broken API contracts, orphaned routes). Collapsing to a single agent defeats the purpose of the entire workflow.
+These are the most important rules in this document. They exist because context pressure, token limits, and efficiency instincts create powerful incentives to cut corners.
+
+### The Three Temptations
+
+1. **Tempted to skip tests due to context pressure**: STOP. Spawn a Test Agent anyway. If context is genuinely constrained, spawn a fresh agent with only the necessary context — the spec and the file paths. Tests written by a dedicated agent from specs are better than no tests.
+
+2. **Tempted to write code inline for speed**: STOP. Spawn a Code Agent. The 30 seconds saved by writing inline is lost tenfold when the code has no independent review or test coverage. Speed is not a value in this workflow; correctness is.
+
+3. **Tempted to summarise what reviewers "would say"**: STOP. Actually run the council via the dispatch script. A real review catches things that a simulated review cannot, because the simulated review is limited by the same blind spots as the code author.
+
+### The Quality Test
+
+Before completing any phase, ask:
+
+> "Would this produce the same quality if the agent had unlimited context and time? If not, it's a shortcut."
+
+If the answer is "no, with more context I would have written more tests / done a deeper review / structured this differently", then the work is incomplete. Find a way to achieve the higher-quality outcome, even if it means spawning additional agents or breaking the work into smaller pieces.
 
 ---
 
 ## Anti-Hallucination Rules
 
-1. **Never guess at implementation details** — always read the code or spec first
-2. **Review agents must cite specific concerns** — no vague "this could be a problem"
-3. **Test agents write tests from the spec** — not from the implementation
-4. **If unsure, ask** — don't fabricate an answer
-5. **Each agent has a narrow mandate** — architecture agent doesn't write code, test agent doesn't review security
-6. **Verify before asserting** — grep the codebase before claiming something exists or doesn't exist
-7. **Never mark a feature as "done" without comparing to the spec/reference** — read the actual code, verify it matches
-8. **Never mark a test as "sufficient" without verifying it tests behaviour** — a test that passes regardless of whether the feature works is not a test
+AI agents can confidently assert things that are not true. These rules prevent that.
+
+1. **Never assert a file exists without reading it.** Use `Read` or `Glob` to verify. "I believe there's a config file at..." is not acceptable — check.
+
+2. **Never assert a test passes without running it.** Use `Bash` to execute the test suite. "This test should pass because..." is not evidence. Run it.
+
+3. **Never claim a feature works without verifying the code path.** Trace the execution from entry point to output. Read each file in the chain. Confirm the logic is connected.
+
+4. **Never assume an import path — check the actual file.** Read the source file to confirm the export exists and the path is correct. Import path mismatches are one of the most common AI coding errors.
+
+5. **Read context files before writing code.** Before modifying or creating a file, read the files it depends on and the files that depend on it. Understand the context before making changes.
+
+6. **When verifying: read the actual file, don't rely on memory of what was written.** After writing a file, if you need to verify its contents, read it again. Memory of what was written can differ from what was actually written (especially after edits, merges, or tool errors).
+
+---
+
+## Workflow Sync Enforcement
+
+This workflow is maintained as a template that is shared across multiple projects. Changes made during a project must flow back to the template to benefit all projects.
+
+### Tracked Workflow Files
+
+- `.claude/skills/*` — All skill definitions
+- `.claude/workflow-rules.md` — This file
+- `scripts/council-dispatch.py` — Council review dispatch script
+- `scripts/council-check.sh` — Council review status check script
+
+### Sync Rules
+
+1. Any modification to tracked workflow files during a sprint MUST be recorded in the retrospective.
+2. The `/retrospective` skill checks for unsynchronised workflow changes by comparing tracked files against the template repo.
+3. If unsynchronised changes are found, the retrospective blocks completion until one of:
+   - Changes are synced back to the template via `/sync push`
+   - Changes are explicitly marked as project-specific overrides with user approval
+4. Project-specific overrides are documented in `CLAUDE.md` under a "Workflow Overrides" section with justification.
+
+### Sync Commands
+
+- `/sync pull` — Pull latest workflow files from template repo into current project
+- `/sync push` — Push workflow file changes from current project back to template repo
 
 ---
 
 ## Git Workflow
 
-- Feature branches off main
-- Commits only after Phase 2 approval
-- Commit messages describe the "why"
-- Never commit without passing tests
+### Branch Strategy
+
+- `main` — Production-ready code. Never commit directly.
+- `sprint/<N>` — Feature branch for each sprint. Created by `/sprint`, developed on by `/develop`, merged after `/retrospective`.
+- Hotfix branches follow the pattern `hotfix/<description>` and bypass the sprint cycle with user approval.
+
+### Commit Rules
+
+1. Commits are only made after all tests pass. A failing test suite blocks commits.
+2. Each commit has a descriptive message following conventional commit format.
+3. Work-in-progress commits are allowed on sprint branches but must be squashed before merge.
+
+### Pull Request Rules
+
+1. PRs are created at the end of `/develop` for the sprint branch.
+2. PRs require CI gate checks to pass before merge.
+3. PR descriptions include:
+   - Summary of changes
+   - Link to sprint plan
+   - Test coverage summary
+   - Any known limitations or follow-up items
+4. PRs are not merged until the `/retrospective` for that sprint is complete.

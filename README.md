@@ -1,360 +1,236 @@
-# Claude Code Multi-Agent Workflow
+# Workflow Template
 
-A reusable set of Claude Code skills that enforce a gated, multi-agent development workflow. Copy this into any project to get structured planning, parallel implementation with tests, automated reviews, and spec compliance verification.
+A reusable workflow template for [Claude Code](https://claude.com/claude-code) that enforces a gated, multi-agent development pipeline. Every code change flows through setup, business analysis, planning with council review, implementation with parallel agents, and retrospective improvement.
 
-## What This Is
+The workflow distributes expert review across multiple AI platforms (Codex CLI, Google Gemini, Anthropic Claude API, OpenAI) so that no single model reviews its own output. A council of specialists -- security, architecture, testing, spec compliance, domain expertise -- reviews plans and code at every stage gate, with an arbitrator synthesising findings and filtering noise.
 
-11 slash-command skills for [Claude Code](https://claude.com/claude-code) that work together as a development pipeline. Every code change goes through discovery, planning, review, implementation, and verification — with multiple specialised agents running in parallel at each phase.
+Clone this template into any software project to bootstrap a structured, repeatable development process from day one.
 
-The workflow is **project-agnostic**. It works with any stack, framework, or language. Project-specific details (stack, commands, patterns, design system) are discovered automatically by the skills and written to `CLAUDE.md` as they run.
+---
 
 ## Quick Start
 
-### Option A: Copy into your project (one-time)
+### Option A: Clone into your project
+
+Copy the workflow files into an existing project:
 
 ```bash
-git clone https://github.com/tf-pwr-up/workflow_template.git /tmp/wf-template
-
-cp -r /tmp/wf-template/.claude your-project/.claude
-cp /tmp/wf-template/CLAUDE.md your-project/CLAUDE.md
+git clone https://github.com/<org>/workflow.git /tmp/wf
+cp -r /tmp/wf/.claude your-project/.claude
+cp -r /tmp/wf/scripts your-project/scripts
+cp /tmp/wf/CLAUDE.md your-project/CLAUDE.md
 mkdir -p your-project/docs
-cp /tmp/wf-template/docs/bug-patterns.md your-project/docs/bug-patterns.md
-
-rm -rf /tmp/wf-template
+cp /tmp/wf/docs/bug-patterns.md your-project/docs/
+cp -r /tmp/wf/.github your-project/.github
+rm -rf /tmp/wf
 ```
 
-### Option B: Fork with upstream sync (recommended)
+### Option B: Git remote with sync (recommended)
 
-This approach lets you pull template improvements and push back skill enhancements:
+Use a git remote so you can pull template updates over time:
 
 ```bash
-# Create your project repo
 mkdir your-project && cd your-project && git init
-
-# Add the template as upstream
-git remote add template https://github.com/tf-pwr-up/workflow_template.git
-git fetch template
-git merge template/master --allow-unrelated-histories
-
-# Add your own remote
+git remote add workflow https://github.com/<org>/workflow.git
+git fetch workflow
+git merge workflow/main --allow-unrelated-histories
 git remote add origin git@github.com:your-org/your-project.git
-git push -u origin master
+git push -u origin main
 ```
 
-Now you can sync skills bidirectionally — see [Upstream Sync](#upstream-sync) below.
+This approach enables `/sync pull` and `/sync push` to keep your project's workflow files aligned with the template as it evolves.
 
-### Start building
+### Team Onboarding
 
-```bash
-cd your-project
-claude
-```
+1. Clone the project repo.
+2. Run `scripts/council-check.sh` to verify platform access and API connectivity.
+3. Set up API keys in `~/.zprofile` (or your shell profile):
+   ```bash
+   export GOOGLE_API_KEY="your-key"
+   export ANTHROPIC_API_KEY="your-key"
+   export OPENAI_API_KEY="your-key"
+   ```
+4. Run `codex login` to authenticate the Codex CLI.
+5. Run `/setup` for new projects, or `/sprint <N>` to join a project mid-flight.
 
-```
-/analyze /path/to/reference-or-specs    # Bootstrap project config
-/phase-0                                 # Inventory & gap analysis
-/plan                                    # Design + multi-perspective review
-/implement                               # Parallel code + test agents
-```
+---
 
 ## The Pipeline
 
 ```
-/analyze  →  /phase-0  →  /plan  →  /implement  →  /pre-deploy
-                                         ↑
-                                    /review (anytime)
-                                    /ui-review (anytime)
-                                    /postmortem (when bugs found)
-                                    /spec-compliance (anytime)
-                                    /sync-template (to sync with upstream)
+/setup --> /analyze --> [/sprint <N> --> /develop <N> --> /retrospective <N>] (repeat)
+                              ^
+                         /review (anytime)
 ```
 
-Each phase gates the next. No planning without a gap list. No implementation without a plan. No deployment without passing all checks.
+Each phase produces artefacts that gate entry to the next phase. No phase can begin until its predecessor's gate conditions are met.
 
-For detailed Mermaid diagrams of the complete workflow, agent interactions, and data flows, see **[docs/workflow-diagram.md](docs/workflow-diagram.md)**.
+| Phase | Gate Output | Required Before |
+|-------|-------------|-----------------|
+| `/setup` | Populated `CLAUDE.md` and `council-config.json` | `/analyze` |
+| `/analyze` | Requirements doc with prioritised findings from actual codebase reading | `/sprint` |
+| `/sprint <N>` | Sprint plan with task breakdown, acceptance criteria, and test specifications | `/develop <N>` |
+| `/develop <N>` | All code written, all tests passing, E2E verified, full suite green | `/retrospective <N>` |
+| `/retrospective <N>` | Retrospective complete, bug patterns logged, workflow changes synced | Next `/sprint <N+1>` |
+
+If a gate's artefacts are missing or incomplete, the entering skill halts and reports what is missing rather than proceeding with assumptions. `/review` is the exception -- it can be invoked at any time during development without blocking other phases.
+
+---
+
+## Skills Reference
+
+| Skill | Description |
+|-------|-------------|
+| `/setup` | Interactive project setup. Bootstraps the workflow through guided questioning -- establishes project identity, stack, architecture patterns, and configures the council of experts. Produces `CLAUDE.md` and `council-config.json`. |
+| `/analyze` | High-level business analysis. Establishes what needs to be built through structured BA questioning, producing requirements broken into proposed sprints, reviewed and approved by the council. |
+| `/sprint <N>` | Sprint planning and council review. Produces a comprehensive, council-reviewed implementation plan with task breakdown, acceptance criteria, gap analysis, and test specifications. No code is written in this phase. |
+| `/develop <N>` | Development and testing with parallel agents. Orchestrates Code Agents (implementation), Test Agents (specs-first testing), and Fix Agents (failure resolution). Runs unit tests, E2E tests, and the full suite before completion. |
+| `/retrospective <N>` | Sprint retrospective and workflow improvement. Examines the review process, logs bug patterns to `docs/bug-patterns.md`, updates `CLAUDE.md` with established patterns, and syncs workflow changes back to the template. |
+| `/review` | Standalone code review. Runs the council review process against uncommitted changes, specific files, or work-in-progress code outside the normal sprint cycle. |
+| `/council-review` | Council of experts review (invoked by other skills, not directly). Orchestrates multi-platform expert review with arbitration, findings tracking, and convergence logic. Delegates mechanical dispatch to `scripts/council-dispatch.py`. |
+| `/sync` | Bidirectional template sync. `/sync pull` updates project workflow files from the template. `/sync push` pushes project improvements back. `/sync status` reports the current sync state. |
+
+---
+
+## Council of Experts
+
+The council is a multi-platform review system that provides independent expert assessment at every stage gate. Reviews are dispatched to external AI platforms in parallel so that no single model reviews its own output.
+
+### Council Composition
+
+**6 core members** (always active):
+
+| Role | Review Lens |
+|------|-------------|
+| Security Reviewer | Vulnerabilities, auth, data exposure, injection, secrets handling |
+| Architecture Reviewer | Structural soundness, separation of concerns, scalability, patterns |
+| Spec Compliance Reviewer | Adherence to requirements, acceptance criteria, completeness |
+| Testing Reviewer | Test coverage, edge cases, test quality, missing scenarios |
+| Domain Expert | Business logic correctness, domain invariants, terminology |
+| Arbitrator | Synthesises all findings, resolves contradictions, filters scope creep and nitpicking, assigns final priority |
+
+**3 optional members** (activated per project via `/setup`):
+
+| Role | Review Lens |
+|------|-------------|
+| Performance Reviewer | Latency, throughput, resource usage, algorithmic complexity |
+| UX/DX Reviewer | Developer experience, API ergonomics, user-facing quality |
+| Cost Reviewer | Infrastructure cost, API call volume, resource efficiency |
+
+### How It Works
+
+1. Review materials are gathered and secrets are redacted.
+2. All regular council members receive the materials and review in parallel, each through their specific lens.
+3. The **Arbitrator** runs last, receiving all other members' findings. It synthesises a consolidated assessment, resolves contradictions, flags scope creep or nitpicking, and assigns a final verdict.
+4. Results are written to a **findings tracker** (`docs/findings/`) with per-member verdicts, severity counts, and detailed findings.
+5. If the verdict is `CHANGES_REQUESTED`, findings feed back into the development loop for resolution.
+
+### Convergence Guardrails
+
+- Maximum **5 review rounds** per review type per sprint. If round 5 still yields `CHANGES_REQUESTED`, the review escalates for manual triage.
+- A **quorum of 3** successful reviews is required for a valid verdict.
+- Each member has a configurable **fallback platform** in case the primary fails. The dispatch script retries twice before falling back.
+
+### Supported Platforms
+
+| Platform | Auth Method | Models |
+|----------|-------------|--------|
+| Codex CLI | `codex login` | Default (auto) |
+| Google Gemini | `GOOGLE_API_KEY` | gemini-2.5-pro, gemini-2.5-flash |
+| Anthropic Claude | `ANTHROPIC_API_KEY` | claude-sonnet-4, claude-haiku |
+| OpenAI | `OPENAI_API_KEY` | gpt-4o, o3 |
+
+Council composition (which members use which platform) is configured in `council-config.json`, generated by `/setup`.
+
+---
 
 ## File Architecture
 
 ```
-your-project/
-├── .claude/
-│   ├── workflow-rules.md               # Generic workflow rules (synced with template)
-│   └── skills/
-│       ├── analyze.md                  # Deep analysis & documentation
-│       ├── e2e.md                      # End-to-end integration tests
-│       ├── implement.md               # Parallel code + test implementation
-│       ├── phase-0.md                 # Feature inventory & gap analysis
-│       ├── plan.md                    # Multi-perspective planning
-│       ├── postmortem.md              # Bug postmortem & workflow improvement
-│       ├── pre-deploy.md             # Pre-deployment gate check
-│       ├── review.md                  # Multi-perspective code review
-│       ├── spec-compliance.md         # Verify implementation matches spec
-│       ├── sync-template.md           # Upstream template sync
-│       └── ui-review.md              # UI quality review
-├── docs/
-│   ├── analysis/                      # Created by /analyze (persistent corpus)
-│   ├── gaps/                          # Created by /phase-0 (gap lists)
-│   └── bug-patterns.md               # Created by /postmortem (bug registry)
-└── CLAUDE.md                          # Project-specific config (auto-populated)
+.claude/
+  settings.json              # Claude Code permissions (auto-generated)
+  workflow-rules.md          # Enforcement rules, ground rules, bypass prevention
+  skills/
+    setup/SKILL.md           # /setup skill definition
+    analyze/SKILL.md         # /analyze skill definition
+    sprint/SKILL.md          # /sprint skill definition
+    develop/SKILL.md         # /develop skill definition
+    retrospective/SKILL.md   # /retrospective skill definition
+    review/SKILL.md          # /review skill definition
+    council-review/SKILL.md  # /council-review skill definition
+    sync/SKILL.md            # /sync skill definition
+.github/
+  workflows/
+    workflow-gate.yml        # CI gate — enforces reviews, plans, tests, sync
+scripts/
+  council-dispatch.py        # Mechanical API dispatch for council reviews
+  council-check.sh           # Prerequisite checker (keys, connectivity, config)
+docs/
+  bug-patterns.md            # Bug pattern registry (updated by /retrospective)
+  workflow-diagram.md        # Mermaid diagrams of all workflow flows
+  requirements/              # (generated) Requirements from /analyze
+  plans/                     # (generated) Sprint plans from /sprint
+  gaps/                      # (generated) Gap analyses from /sprint
+  findings/                  # (generated) Council findings trackers
+  reviews/                   # (generated) Individual reviewer outputs
+CLAUDE.md                    # Living project config (auto-populated by skills)
+council-config.json          # (generated) Council composition from /setup
 ```
 
-### What's synced vs what's project-specific
+Directories marked `(generated)` are created by skills during execution. The template ships with the base structure; project-specific artefacts accumulate as the workflow runs.
 
-| File | Synced with template | Content |
-|------|---------------------|---------|
-| `.claude/workflow-rules.md` | Yes | Workflow phases, gates, enforcement rules, anti-hallucination rules |
-| `.claude/skills/*.md` | Yes | All 11 skill definitions |
-| `CLAUDE.md` | **No** — project-specific | Project config: stack, commands, patterns, conventions |
-| `docs/` | **No** — project-specific | Analysis corpus, gap lists, bug pattern registry |
+---
 
-## How CLAUDE.md Auto-Populates
+## Team Consistency
 
-`CLAUDE.md` starts with empty placeholder sections. Skills fill them in as they discover project-specific details:
+The workflow is designed for multi-developer teams where every contributor runs the same structured process.
 
-| Skill | What it writes | When |
-|-------|---------------|------|
-| `/analyze` | Stack, Directory Structure, Design System, Patterns, Data Model | After discovery and cross-cutting analysis |
-| `/plan` | Established Patterns, Test Conventions | After review consolidation |
-| `/implement` | Commands, Test Conventions, Coding Conventions | After integration checks pass |
-| `/review` | Coding Conventions, Established Patterns | After review identifies undocumented conventions |
-| `/postmortem` | Bug Patterns | After bug analysis |
+- **Git remote + `/sync`**: The template repo is added as a git remote. `/sync pull` brings in template updates; `/sync push` contributes improvements back. This keeps all projects on the same workflow version.
+- **CI gate**: The GitHub Actions workflow (`workflow-gate.yml`) enforces that every PR to `main` has council review artefacts, an approved plan, a passing test suite, and no unapproved workflow file modifications.
+- **Individual API keys**: Each developer configures their own API keys in `~/.zprofile`. Keys are never committed to the repo. The `council-check.sh` script verifies each developer's setup.
+- **Workflow change tracking**: Any modification to tracked workflow files (skills, rules, scripts) during a sprint is flagged in the retrospective. Changes must either sync back to the template or be explicitly marked as project-specific overrides in `CLAUDE.md`.
 
-Each cycle adds more knowledge. The file grows into a comprehensive project reference that makes subsequent development cycles more accurate and efficient.
+---
 
 ## Upstream Sync
 
-The `/sync-template` skill manages bidirectional sync between your project and this template.
+The `/sync` skill manages bidirectional synchronisation between your project and the workflow template.
 
-### Pull template updates
+| Command | What It Does |
+|---------|-------------|
+| `/sync pull` | Fetches the latest workflow files from the template repo and applies them to your project, preserving any documented project-specific overrides. |
+| `/sync push` | Identifies workflow files you have modified locally, filters out project-specific overrides, and creates a PR against the template repo with your improvements. Requires GitHub CLI (`gh`). |
+| `/sync status` | Compares all tracked workflow files against the template and reports which are in sync, which have local changes, and which have upstream updates available. |
 
-When the template gets new skills or improved workflow rules:
-
-```
-/sync-template pull
-```
-
-This fetches changes from the template remote and updates your shared files (`.claude/workflow-rules.md`, `.claude/skills/*.md`). Your project-specific `CLAUDE.md` and `docs/` are never touched.
-
-### Push improvements back
-
-When you improve a skill or add a prevention rule via `/postmortem` that would benefit all projects:
-
-```
-/sync-template push
-```
-
-This reviews your skill changes for project-specific content, genericises if needed, and creates a PR on the template repo. Only generic improvements are pushed — project-specific bug examples, paths, and patterns stay local.
-
-### Check sync status
-
-```
-/sync-template status
-```
-
-Shows which shared files are ahead, behind, or in sync with the template.
-
-### Setup
-
-Your project needs the template as a git remote:
-
-```bash
-git remote add template https://github.com/tf-pwr-up/workflow_template.git
-```
-
-## Skills Reference
-
-### `/analyze` — Deep Analysis & Documentation
-
-**When**: Starting a new project, onboarding to a codebase, or when the reference has changed.
-
-Analyses a source (codebase, spec documents, or both) and produces a persistent documentation corpus in `docs/analysis/`. Handles three source types:
-
-- **Codebase** — reads code, extracts routes, API surface, data models, components, state management
-- **Specs/Requirements** — reads documents, extracts features, user stories, constraints, terminology
-- **Mixed** — uses code as ground truth, specs as intent
-
-Runs 7 phases:
-1. **Discovery** — structural map of the source
-2. **Feature Decomposition** — detailed per-area documentation
-3. **Cross-Cutting Concerns** — design system and recurring patterns
-4. **User Q&A** — asks clarifying questions about requirements and scope
-5. **BA Review** — iterative quality gate (up to 3 rounds) checking for gaps, ambiguities, and contradictions
-6. **Implementation Checklists** — atomic, testable work items per feature area
-7. **Summary & Index** — table of contents, recommended build order, scope estimate
+Tracked files: `.claude/skills/**`, `.claude/workflow-rules.md`, `scripts/council-dispatch.py`, `scripts/council-check.sh`, `.github/workflows/workflow-gate.yml`.
 
 ---
 
-### `/phase-0` — Feature Inventory & Gap Analysis
+## CI Gate
 
-**When**: Before planning any work. Mandatory prerequisite for `/plan`.
+The GitHub Actions workflow (`.github/workflows/workflow-gate.yml`) runs on every pull request targeting `main` and enforces five checks:
 
-Compares what should exist (from analysis docs or reference) against what currently exists in the codebase. Produces a gap list classifying each feature as DONE, PARTIAL, or MISSING.
+1. **Review artefacts exist** -- At least one findings tracker must be present in `docs/findings/`.
+2. **Plan exists** -- A sprint plan in `docs/plans/` or requirements doc in `docs/requirements/` must be present.
+3. **Approved verdict** -- The most recent findings tracker must contain a `Verdict: APPROVED` line.
+4. **Tests pass** -- The project's test suite must pass. The test command is auto-detected (npm test, pytest, go test, cargo test, make test) or can be set via the `TEST_COMMAND` repository variable.
+5. **No unapproved workflow edits** -- If tracked workflow files are modified, they must be listed in a "Workflow Overrides" section of `CLAUDE.md` or have a corresponding sync PR on the template repo.
 
-Also checks the **integration surface** — orphaned routes, unregistered components, dead endpoints, and mismatched API contracts.
-
-**Output**: `docs/gaps/YYYY-MM-DD-<area>.md`
-
----
-
-### `/plan` — Multi-Perspective Planning
-
-**When**: After `/phase-0` produces a gap list.
-
-Produces a numbered implementation plan, then runs it through parallel review agents:
-
-- **Architecture Agent** — pattern consistency, data model, interfaces
-- **Security Agent** — auth/authz, injection, validation, OWASP Top 10
-- **Performance Agent** — algorithms, N+1 queries, memory leaks, bundle size
-- **Testability Agent** — test strategy, edge cases, E2E test plan
-- **UI Review Agent** — design system compliance, visual states, responsiveness (if UI changes)
-- **Spec Compliance Agent** — verifies plan covers every gap list item (MANDATORY)
-
-Each plan unit includes **context files to read** — files that code agents must read before writing code, preventing them from guessing at contracts.
+All five checks must pass for a PR to merge. Test runner setup (Node.js, Python) is handled automatically.
 
 ---
-
-### `/implement` — Parallel Code + Test Implementation
-
-**When**: After a plan is approved.
-
-Breaks the plan into implementation units and runs parallel agent pairs:
-
-- **Code Agent** — reads context files first, then implements production code
-- **Test Agent** — writes tests from the spec (not from the code)
-- **E2E Test Agent** — adds/updates browser tests for user-facing changes
-
-Then runs a verification sequence:
-1. **UI Review** — design system compliance, visual states, accessibility
-2. **Smoke Wiring Check** — routes registered, links valid, API contracts match, forms complete
-3. **Integration Check** — type check, full test suite, E2E tests, cross-file issues
-4. **Fix Failures** — code is fixed to match tests (tests are the spec)
-5. **Spec Compliance** — mandatory final gate verifying every gap list item
-
----
-
-### `/review` — Multi-Perspective Code Review
-
-**When**: Anytime — on uncommitted changes, specific files, or by description.
-
-Spawns 5 parallel review agents:
-
-- **UI Review** — design system, visual states, responsive, dark mode, accessibility
-- **Architecture** — conventions, API contracts, form bindings, link construction, bug patterns
-- **Security** — auth, injection, input validation, URL param resolution
-- **Performance** — algorithms, re-renders, caching, memory leaks
-- **Test Coverage** — unit tests, edge cases, E2E coverage
-
-Findings grouped by severity: BLOCKING → SHOULD FIX → CONSIDER.
-
----
-
-### `/ui-review` — UI Quality Review
-
-**When**: Anytime on frontend code. Also runs automatically within `/review` and `/implement`.
-
-| Category | What it checks |
-|----------|---------------|
-| Design system compliance | Uses project shortcuts/tokens, not raw utility strings |
-| Visual states | Loading, empty, error, success — all present |
-| Responsive | Mobile-first breakpoints, no overflow, tappable targets |
-| Dark mode | All elements have dark mode variants (if supported) |
-| Consistency | Matches spacing, typography, actions of adjacent pages |
-| Reference comparison | Matches reference implementation layout (if one exists) |
-| Accessibility | Labels, alt text, focus styles, semantic HTML |
-| Polish | Icons, transitions, loading indicators |
-
----
-
-### `/spec-compliance` — Verify Implementation Matches Spec
-
-**When**: After implementation, before commit. Also standalone to check current state.
-
-Verifies every gap list item against the actual codebase:
-- Code exists and matches spec behaviour
-- UI features are reachable (no orphaned routes or components)
-- Unit and E2E tests exist
-- All links match router definitions
-- API contracts match (frontend types vs backend response shapes)
-- Create/edit forms include all required fields
-
-**Verdict**: PASS (0 FAILs) or FAIL (blocks commit).
-
----
-
-### `/e2e` — End-to-End Integration Tests
-
-**When**: After implementation or as a standalone check.
-
-Runs two test suites:
-1. **Contract tests** — API response shape verification against frontend expectations
-2. **Browser tests** — critical user flows in a real browser
-
-Includes maintenance rules ensuring E2E tests stay in sync with feature changes.
-
----
-
-### `/pre-deploy` — Pre-Deployment Gate Check
-
-**When**: Before any deployment or merge.
-
-Runs 7 parallel gate checks: test suite, type check, lint, security scan, dependency check, E2E tests, spec compliance.
-
-**Verdict**: READY or NOT READY. A single failure blocks deployment.
-
----
-
-### `/postmortem` — Bug Postmortem & Workflow Improvement
-
-**When**: After any bug is found and fixed.
-
-1. Documents and classifies the bug pattern
-2. Traces which workflow phase should have caught it
-3. Designs automatable prevention rules
-4. Updates skill files with new checks
-5. Adds to `docs/bug-patterns.md` registry
-
-This is how the workflow improves itself over time.
-
----
-
-### `/sync-template` — Upstream Template Sync
-
-**When**: To pull template updates or push skill improvements back.
-
-Three modes:
-- `pull` — merge latest skills from template
-- `push` — contribute generic skill improvements back (creates PR)
-- `status` — check what's ahead/behind
-
-See [Upstream Sync](#upstream-sync) above.
-
-## Workflow Modes
-
-### Full Review
-For new patterns, schema changes, auth/security, or anything novel:
-- 5-6 review agents evaluate the plan
-- User approval required before implementation
-
-### Standard
-For features following established patterns:
-- 2 review agents (Architecture+Security, Spec Compliance)
-- Auto-proceeds if no FAIL items
-
-## Key Design Principles
-
-1. **Tests come from the spec, not the code** — prevents tests that verify broken behaviour
-2. **Multiple perspectives catch different bug classes** — security, architecture, performance, UI, spec compliance
-3. **Automated cross-checks** catch what humans miss — orphaned routes, broken API contracts, missing form fields
-4. **Context files before code** — agents read contracts before implementing, never guess
-5. **The workflow improves itself** — `/postmortem` traces escape paths and adds prevention rules
-6. **No code ships without passing every gate** — gap list → plan review → tests → type check → spec compliance → E2E
-7. **Project knowledge accumulates** — CLAUDE.md grows richer with each cycle, reducing errors over time
 
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code) CLI
-- A git repository (the workflow uses git for commits and change tracking)
-- GitHub CLI (`gh`) — for `/sync-template push` PR creation
+| Requirement | Purpose |
+|-------------|---------|
+| [Claude Code CLI](https://claude.com/claude-code) | Runs the workflow skills and orchestrates agents |
+| Git | Version control, branch management, diff generation |
+| [GitHub CLI](https://cli.github.com/) (`gh`) | Required for `/sync push` (creates PRs against the template repo) |
+| Python 3 | Runs `scripts/council-dispatch.py` for council review dispatch |
+| API keys for at least 2 platforms | Required to meet the quorum minimum of 3 successful reviews (Codex counts as one platform) |
+
+---
 
 ## License
 
